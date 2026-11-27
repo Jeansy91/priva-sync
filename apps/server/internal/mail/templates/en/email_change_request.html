@@ -1,0 +1,14 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;">Confirm your email address</h1>
+<p style="margin:0 0 16px;">Hello {{.Username}},</p>
+<p style="margin:0 0 16px;">You requested to change your PrivaSync email address to <strong>{{.NewEmail}}</strong>. Click the button below to confirm the new address. The link is valid for <strong>{{.ExpiresIn}}</strong>.</p>
+
+<p style="margin:24px 0;">
+  <a href="{{.ConfirmURL}}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Confirm email</a>
+</p>
+
+<p style="margin:16px 0;font-size:13px;color:#666;">If the button does not work, paste this link into your browser:<br>
+<span style="word-break:break-all;font-family:monospace;font-size:12px;">{{.ConfirmURL}}</span></p>
+
+<p style="margin:16px 0 0;font-size:13px;color:#666;">If you did not request this change, you can ignore this email — your current address stays active.</p>
+{{end}}

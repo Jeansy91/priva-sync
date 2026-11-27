@@ -1,0 +1,22 @@
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <CustomAction
+      Id="RegisterPrivaSyncContextMenu"
+      Directory="INSTALLDIR"
+      ExeCommand='powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "register-context-menu.ps1" -Action Install'
+      Execute="deferred"
+      Impersonate="yes"
+      Return="check" />
+    <CustomAction
+      Id="UnregisterPrivaSyncContextMenu"
+      Directory="INSTALLDIR"
+      ExeCommand='powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "register-context-menu.ps1" -Action Remove'
+      Execute="deferred"
+      Impersonate="yes"
+      Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="RegisterPrivaSyncContextMenu" After="InstallFiles">NOT REMOVE</Custom>
+      <Custom Action="UnregisterPrivaSyncContextMenu" Before="RemoveFiles">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+  </Fragment>
+</Wix>

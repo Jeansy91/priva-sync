@@ -1,0 +1,24 @@
+{
+  "name": "@privasync/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./locales/de": "./src/locales/de.json",
+    "./locales/en": "./src/locales/en.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "i18next": "^23.16.8",
+    "i18next-browser-languagedetector": "^8.2.3",
+    "react-i18next": "^15.7.4"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  }
+}

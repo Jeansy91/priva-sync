@@ -1,0 +1,16 @@
+Sync-Konflikt — PrivaSync
+
+Hallo {{.Username}},
+
+{{if gt .Count 1}}beim Synchronisieren gab es {{.Count}} Konflikte. Die betroffenen
+Dateien wurden lokal jeweils unter einem neuen Namen gesichert.
+{{range .FilePaths}}
+  {{.}}{{end}}
+{{else}}beim Synchronisieren einer Datei gab es einen Konflikt. Die Datei
+wurde lokal unter einem neuen Namen gesichert.
+
+  {{.FilePath}}
+{{end}}
+Konflikt lösen: {{.ConflictsURL}}
+
+— PrivaSync

@@ -1,0 +1,16 @@
+Sync conflict — PrivaSync
+
+Hi {{.Username}},
+
+{{if gt .Count 1}}syncing produced {{.Count}} conflicts. The affected files were each
+saved locally under a new name.
+{{range .FilePaths}}
+  {{.}}{{end}}
+{{else}}syncing one of your files produced a conflict. The file was
+saved locally under a new name.
+
+  {{.FilePath}}
+{{end}}
+Resolve: {{.ConflictsURL}}
+
+— PrivaSync

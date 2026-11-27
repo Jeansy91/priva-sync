@@ -1,0 +1,9 @@
+Freigabe widerrufen — PrivaSync
+
+Hallo {{.Username}},
+
+{{.SharerName}} hat die Freigabe von {{.FileName}} widerrufen.
+Du hast ab sofort keinen Zugriff mehr auf diese Datei. Lokale Kopien
+auf deinen Geräten bleiben erhalten.
+
+— PrivaSync

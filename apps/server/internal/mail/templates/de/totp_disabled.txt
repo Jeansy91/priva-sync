@@ -1,0 +1,14 @@
+Sicherheitshinweis: 2FA deaktiviert — PrivaSync
+
+Hallo {{.Username}},
+
+soeben wurde die Zwei-Faktor-Authentifizierung für dein Konto
+deaktiviert:
+
+  Zeitpunkt:     {{.When}}
+  IP-Adresse:    {{.IPAddress}}
+
+Warst du das nicht? Ändere sofort dein Passwort und aktiviere
+2FA erneut: {{.BaseURL}}/settings
+
+— PrivaSync

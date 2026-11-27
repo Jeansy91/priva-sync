@@ -1,0 +1,37 @@
+[package]
+name    = "privasync-shell"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# In-proc COM shell extension (IExplorerCommand) for the Windows Explorer
+# context menu (ADR-0021). Kept a standalone crate so it builds independently
+# of the Tauri daemon; the only contract between them is the named-pipe NDJSON
+# protocol mirrored in `proto.rs`.
+[lib]
+name        = "privasync_shell"
+# rlib alongside cdylib so the debug host example (examples/host.rs) can build.
+crate-type  = ["cdylib", "rlib"]
+
+[dependencies]
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-core = "0.62"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_Storage_FileSystem",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+opt-level = "s"
+lto       = true
+strip     = true

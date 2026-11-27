@@ -1,0 +1,42 @@
+tray:
+  open: Open
+  syncNow: Sync now
+  settings: Settings
+  openRoots: Open folder
+  groupOwned: Sync folders
+  groupShared: Shared with me
+  quit: Quit
+  conflicts:
+    show: "Show conflicts (%{count})"
+    none: No conflicts
+  status:
+    ready: PrivaSync — Ready
+    syncing: "PrivaSync — Syncing %{count} file(s)…"
+    conflicts: "PrivaSync — %{count} conflict(s)"
+  tooltip:
+    ready: PrivaSync — Ready
+    syncing: PrivaSync — Syncing…
+    conflict: PrivaSync — Conflict!
+    offline: PrivaSync — Server offline
+    unauthenticated: PrivaSync — Not signed in
+    empty: PrivaSync — No sync root
+  update:
+    label: "Update available (%{version})"
+    notifyTitle: PrivaSync — Update available
+    notifyBody: "Version %{version} is ready. See the app for details."
+    autoTitle: PrivaSync — Installing update
+    autoBody: "Version %{version} is being installed. The app will restart shortly."
+contextmenu:
+  openWeb: Open in web
+  shareWithUser: Share with user
+  createPublicLink: Create public link
+  copyPublicLink: Copy link
+  excludeFromSync: Exclude from sync
+  includeInSync: Include in sync again
+  manageShares: Manage shares
+  resolveConflict: Resolve conflict
+  keepOnDevice: Always keep on this device
+  freeUpSpace: Free up space
+  synchronize: Synchronize
+  group:
+    share: Share

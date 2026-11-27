@@ -1,0 +1,42 @@
+tray:
+  open: Öffnen
+  syncNow: Jetzt synchronisieren
+  settings: Einstellungen
+  openRoots: Ordner öffnen
+  groupOwned: Sync-Ordner
+  groupShared: Mit mir geteilt
+  quit: Beenden
+  conflicts:
+    show: "Konflikte anzeigen (%{count})"
+    none: Keine Konflikte
+  status:
+    ready: PrivaSync — Bereit
+    syncing: "PrivaSync — Synchronisiert %{count} Datei(en)…"
+    conflicts: "PrivaSync — %{count} Konflikt(e)"
+  tooltip:
+    ready: PrivaSync — Bereit
+    syncing: PrivaSync — Synchronisiert…
+    conflict: PrivaSync — Konflikt!
+    offline: PrivaSync — Server offline
+    unauthenticated: PrivaSync — Nicht angemeldet
+    empty: PrivaSync — Kein Sync-Ordner
+  update:
+    label: "Update verfügbar (%{version})"
+    notifyTitle: PrivaSync — Update verfügbar
+    notifyBody: "Version %{version} steht bereit. Details in der App."
+    autoTitle: PrivaSync — Update wird installiert
+    autoBody: "Version %{version} wird jetzt installiert. Die App startet gleich neu."
+contextmenu:
+  openWeb: Im Web öffnen
+  shareWithUser: Mit Benutzer teilen
+  createPublicLink: Öffentlichen Link erstellen
+  copyPublicLink: Link kopieren
+  excludeFromSync: Von Synchronisation ausschließen
+  includeInSync: Wieder synchronisieren
+  manageShares: Freigaben verwalten
+  resolveConflict: Konflikt auflösen
+  keepOnDevice: Immer auf diesem Gerät behalten
+  freeUpSpace: Speicherplatz freigeben
+  synchronize: Synchronisieren
+  group:
+    share: Teilen

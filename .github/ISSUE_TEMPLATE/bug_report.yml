@@ -1,0 +1,71 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please do **not** report security problems here, see SECURITY.md instead.
+        Never paste passwords, tokens, `JWT_SECRET` or other secrets into an issue.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Server
+        - Web UI
+        - Desktop client
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      description: Image tag or commit, for example `0.8.0` or `latest`
+    validations:
+      required: true
+  - type: input
+    id: client-version
+    attributes:
+      label: Desktop client version
+      description: Only if the desktop client is involved
+  - type: input
+    id: os
+    attributes:
+      label: OS and browser
+      description: Operating system of the client (and browser for the web UI)
+      placeholder: e.g. Windows 11 24H2, Chrome 142
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run the server?
+      options:
+        - Docker image from ghcr.io
+        - Self-built Docker image
+        - From source
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Server log, client log or browser console, with personal data removed
+      render: text

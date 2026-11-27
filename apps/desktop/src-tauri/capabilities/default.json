@@ -1,0 +1,14 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for PrivaSync desktop",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "deep-link:default",
+    "notification:default",
+    "shell:allow-open",
+    "dialog:allow-open",
+    "updater:default",
+    "autostart:default"
+  ]
+}

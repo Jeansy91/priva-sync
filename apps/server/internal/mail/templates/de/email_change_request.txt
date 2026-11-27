@@ -1,0 +1,16 @@
+E-Mail-Adresse bestätigen — PrivaSync
+
+Hallo {{.Username}},
+
+du hast angefordert, deine PrivaSync-E-Mail-Adresse auf
+{{.NewEmail}} zu ändern. Öffne den folgenden Link in deinem
+Browser, um die neue Adresse zu bestätigen. Der Link ist
+{{.ExpiresIn}} gültig.
+
+{{.ConfirmURL}}
+
+Wenn du diese Änderung nicht angefordert hast, kannst du
+diese Mail ignorieren — deine bisherige E-Mail-Adresse
+bleibt aktiv.
+
+— PrivaSync

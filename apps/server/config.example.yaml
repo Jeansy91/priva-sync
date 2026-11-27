@@ -1,0 +1,61 @@
+server:
+  host:        "0.0.0.0"
+  api_port:    8080
+  webdav_port: 8081
+  base_url:    "https://sync.example.com"
+
+database:
+  url:              "postgres://privasync:PASSWORD@localhost:5432/privasync"
+  max_conns:        20
+  min_conns:        2
+  conn_max_lifetime: "1h"
+
+auth:
+  jwt_secret:           "CHANGE_ME_generate_with_openssl_rand_hex_32"
+  access_token_ttl:     "15m"
+  refresh_token_ttl:    "720h"
+  # Wie lange ein eben rotierter Refresh-Token noch ein Access-Token liefert
+  # (ADR-0046). Faengt parallele Refreshes eines Clients ab; "0" schaltet das
+  # Kulanzfenster ab.
+  refresh_rotation_grace: "30s"
+  two_fa_session_ttl:   "5m"
+  max_login_attempts:   20
+  login_lockout_window: "1m"
+
+storage:
+  data_path:         "/data"
+  max_upload_size_mb: 10240
+
+sync:
+  delta_threshold_mb: 1
+  block_size_mb:      1
+
+smtp:
+  enabled:    false
+  host:       "smtp.example.com"
+  port:       587
+  username:   "noreply@example.com"
+  password:   "CHANGE_ME"
+  from_name:  "PrivaSync"
+  from_email: "noreply@example.com"
+  # TLS-Modus: "none" (Port 25, kein TLS), "starttls" (Port 587, STARTTLS),
+  # "tls" (Port 465, implizites TLS / SMTPS).
+  tls_mode:   "starttls"
+
+# Optional: externer, OnlyOffice-API-kompatibler Document-Server (Euro-Office)
+# fuer read-only Office-Vorschau (DOCX/XLSX/PPTX) im Web-Dateibrowser. Beide
+# Felder leer lassen, um das Feature auszuschalten -- kein eingebauter
+# Default, kein Repo-eigener Document-Server. Siehe ADR-0027.
+#
+#   url        = Basis-URL OHNE Pfad. Der Web-Client haengt
+#                /web-apps/apps/api/documents/api.js selbst an -- den vollen
+#                api.js-Pfad hier einzutragen fuehrt zu 404 (doppelter Pfad).
+#   jwt_secret = identisch mit dem JWT-Secret des Document-Servers (nicht
+#                auth.jwt_secret -- bewusst getrenntes Signing-Schema).
+#
+# Wichtig: server.base_url (oben) muss vom Document-Server erreichbar sein --
+# er holt die Rohbytes selbst darueber, nicht der Browser. localhost geht nur,
+# wenn der Document-Server auf derselben Maschine laeuft.
+# document_server:
+#   url:        "https://office.example.com"
+#   jwt_secret: "CHANGE_ME_shared_secret_configured_in_the_document_server"

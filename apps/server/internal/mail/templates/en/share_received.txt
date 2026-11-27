@@ -1,0 +1,11 @@
+New share — PrivaSync
+
+Hi {{.Username}},
+
+{{.SharerName}} shared a file with you:
+
+  {{.FileName}}
+
+Open: {{.ShareURL}}
+
+— PrivaSync

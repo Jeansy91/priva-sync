@@ -1,0 +1,98 @@
+# Exactly one server instance -- do not scale this service. Download and
+# office tokens live in process memory, the SSE hub is process-local, and the
+# outbox relies on a single draining worker. See docs/adr/0039.
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"   # REST API + Web-Frontend
+      - "8081:8081"   # WebDAV
+    # Container runs as fixed non-root UID/GID 10001 (Dockerfile, ADR-0034).
+    # First start on a fresh checkout: `mkdir -p ./data ./config && chown -R
+    # 10001:10001 ./data ./config` on the host, otherwise the server can't
+    # write to ./data.
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+    environment:
+      # Env-Format: PRIVASYNC_<SECTION>__<FIELD> — einfacher Unterstrich nach
+      # dem Prefix, doppelter zwischen den Ebenen (siehe config.go).
+      # ── Pflicht ─────────────────────────────────────────────────────────────
+      PRIVASYNC_DATABASE__URL:          "postgres://privasync:${DB_PASSWORD}@db:5432/privasync"
+      PRIVASYNC_AUTH__JWT_SECRET:       "${JWT_SECRET}"
+
+      # ── Server ──────────────────────────────────────────────────────────────
+      PRIVASYNC_SERVER__HOST:           "0.0.0.0"
+      PRIVASYNC_SERVER__API_PORT:       "8080"
+      PRIVASYNC_SERVER__WEBDAV_PORT:    "8081"
+      PRIVASYNC_SERVER__BASE_URL:       "${BASE_URL:-http://localhost:8080}"
+      PRIVASYNC_SERVER__CORS_ORIGINS:   "${CORS_ORIGINS:-http://localhost:8080}"
+      # Comma-separated networks whose X-Forwarded-For/X-Real-IP is believed.
+      # Empty = no forwarding header is trusted, the TCP peer address counts.
+      # Behind a reverse proxy, set this to the proxy's network — otherwise
+      # rate limit, login lockout and audit log see every user as one IP.
+      PRIVASYNC_SERVER__TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      PRIVASYNC_SERVER__STATIC_PATH:    "/srv/web"
+
+      # ── Storage ─────────────────────────────────────────────────────────────
+      PRIVASYNC_STORAGE__DATA_PATH:         "/data"
+      PRIVASYNC_STORAGE__MAX_UPLOAD_SIZE_MB: "${MAX_UPLOAD_SIZE_MB:-10240}"
+
+      # ── Auth-TTLs ───────────────────────────────────────────────────────────
+      PRIVASYNC_AUTH__ACCESS_TOKEN_TTL:      "${ACCESS_TOKEN_TTL:-15m}"
+      PRIVASYNC_AUTH__REFRESH_TOKEN_TTL:     "${REFRESH_TOKEN_TTL:-720h}"
+      PRIVASYNC_AUTH__TWO_FA_SESSION_TTL:    "${TWO_FA_SESSION_TTL:-5m}"
+      PRIVASYNC_AUTH__MAX_LOGIN_ATTEMPTS:    "${MAX_LOGIN_ATTEMPTS:-20}"
+      PRIVASYNC_AUTH__LOGIN_LOCKOUT_WINDOW:  "${LOGIN_LOCKOUT_WINDOW:-1m}"
+
+      # ── Sync ────────────────────────────────────────────────────────────────
+      PRIVASYNC_SYNC__DELTA_THRESHOLD_MB: "${DELTA_THRESHOLD_MB:-1}"
+      PRIVASYNC_SYNC__BLOCK_SIZE_MB:      "${BLOCK_SIZE_MB:-1}"
+
+      # ── Office-Vorschau (optional, ADR-0027) ─────────────────────────────────
+      # Externer OnlyOffice-/Euro-Office-Document-Server. Beide leer = Feature aus.
+      #   URL      = Basis-URL, die der *Browser* erreicht (laedt api.js davon).
+      #   JWT_SECRET = identisch mit dem JWT-Secret im Document-Server.
+      # Wichtig: server.base_url muss vom *Document-Server-Container* erreichbar
+      # sein — er holt die Rohbytes selbst darueber, nicht der Browser.
+      PRIVASYNC_DOCUMENT_SERVER__URL:        "${DOCUMENT_SERVER_URL:-}"
+      PRIVASYNC_DOCUMENT_SERVER__JWT_SECRET: "${DOCUMENT_SERVER_JWT_SECRET:-}"
+
+      # ── SMTP (optional — SMTP__ENABLED=true zum Aktivieren) ─────────────────
+      PRIVASYNC_SMTP__ENABLED:    "${SMTP_ENABLED:-false}"
+      PRIVASYNC_SMTP__HOST:       "${SMTP_HOST:-}"
+      PRIVASYNC_SMTP__PORT:       "${SMTP_PORT:-587}"
+      PRIVASYNC_SMTP__USERNAME:   "${SMTP_USER:-}"
+      PRIVASYNC_SMTP__PASSWORD:   "${SMTP_PASSWORD:-}"
+      PRIVASYNC_SMTP__FROM_NAME:  "${SMTP_FROM_NAME:-PrivaSync}"
+      PRIVASYNC_SMTP__FROM_EMAIL: "${SMTP_FROM_EMAIL:-}"
+      PRIVASYNC_SMTP__TLS_MODE:   "${SMTP_TLS_MODE:-starttls}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:     ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB:       privasync
+      POSTGRES_USER:     privasync
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U privasync"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

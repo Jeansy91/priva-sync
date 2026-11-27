@@ -1,0 +1,13 @@
+Security alert: 2FA disabled — PrivaSync
+
+Hi {{.Username}},
+
+two-factor authentication was just disabled on your account:
+
+  Time:        {{.When}}
+  IP address:  {{.IPAddress}}
+
+Wasn't you? Change your password immediately and re-enable
+2FA: {{.BaseURL}}/settings
+
+— PrivaSync

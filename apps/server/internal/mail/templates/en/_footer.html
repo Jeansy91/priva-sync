@@ -1,0 +1,6 @@
+{{define "footer"}}{{if .OptIn -}}
+You're receiving this email because notifications are enabled in your settings.
+Unsubscribe in <a href="{{.BaseURL}}/settings" style="color:#2563eb;">Settings</a>.
+{{- else -}}
+This is an automated message about your PrivaSync account. Please do not reply.
+{{- end}}{{end}}

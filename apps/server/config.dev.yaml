@@ -1,0 +1,22 @@
+server:
+  host:        "0.0.0.0"
+  api_port:    8080
+  webdav_port: 8081
+  base_url:    "http://localhost:8080"
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+
+auth:
+  access_token_ttl: 24h
+
+storage:
+  data_path:          "./data"
+  max_upload_size_mb: 10240
+
+sync:
+  delta_threshold_mb: 1
+  block_size_mb:      1
+
+# Sensible Werte (DB, Auth, SMTP) kommen via Umgebungsvariablen aus .env
+# Mapping: siehe Makefile dev-server Target

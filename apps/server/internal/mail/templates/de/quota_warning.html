@@ -1,0 +1,16 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;">Speicherplatz {{.Percentage}}% belegt</h1>
+<p style="margin:0 0 16px;">Hallo {{.Username}},</p>
+<p style="margin:0 0 16px;">dein PrivaSync-Speicher ist zu <strong>{{.Percentage}}%</strong> belegt:</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background:#f9fafb;border-radius:6px;margin:16px 0;width:100%;">
+  <tr><td style="padding:12px 16px;"><strong>Belegt:</strong> {{formatBytes .UsedBytes}}</td></tr>
+  <tr><td style="padding:0 16px 12px;"><strong>Quota:</strong> {{formatBytes .QuotaBytes}}</td></tr>
+</table>
+
+<p style="margin:16px 0;">Räume Platz auf oder kontaktiere deinen Administrator für mehr Speicher.</p>
+
+<p style="margin:24px 0;">
+  <a href="{{.BaseURL}}/files" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Dateien verwalten</a>
+</p>
+{{end}}

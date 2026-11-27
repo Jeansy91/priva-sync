@@ -1,0 +1,12 @@
+// Drittlibs ohne mitgelieferte Typen — dynamisch importiert, daher any.
+declare module 'libheif-js'
+declare module 'utif'
+declare module 'epubjs'
+declare module 'three/examples/jsm/loaders/STLLoader.js'
+declare module 'three/examples/jsm/loaders/3MFLoader.js'
+declare module 'three/examples/jsm/loaders/OBJLoader.js'
+declare module 'three/examples/jsm/loaders/GLTFLoader.js'
+declare module 'three/examples/jsm/loaders/PLYLoader.js'
+declare module 'three/examples/jsm/loaders/FBXLoader.js'
+declare module 'three/examples/jsm/loaders/ColladaLoader.js'
+declare module 'three/examples/jsm/loaders/USDZLoader.js'

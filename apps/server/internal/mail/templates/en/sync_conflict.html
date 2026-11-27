@@ -1,0 +1,17 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;">Sync conflict</h1>
+<p style="margin:0 0 16px;">Hi {{.Username}},</p>
+{{if gt .Count 1}}
+<p style="margin:0 0 16px;">syncing produced <strong>{{.Count}} conflicts</strong>. The affected files were each saved locally under a new name — you'll need to decide which version to keep.</p>
+
+<div style="background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;padding:12px 16px;margin:16px 0;font-family:monospace;font-size:14px;">{{range .FilePaths}}<div>{{.}}</div>{{end}}</div>
+{{else}}
+<p style="margin:0 0 16px;">syncing one of your files produced a conflict. The file was saved locally under a new name — you'll need to decide which version to keep.</p>
+
+<div style="background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;padding:12px 16px;margin:16px 0;font-family:monospace;font-size:14px;">{{.FilePath}}</div>
+{{end}}
+
+<p style="margin:24px 0;">
+  <a href="{{.ConflictsURL}}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Resolve conflict</a>
+</p>
+{{end}}

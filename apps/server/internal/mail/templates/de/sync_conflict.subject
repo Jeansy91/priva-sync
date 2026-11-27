@@ -1,0 +1,1 @@
+{{if gt .Count 1}}{{.Count}} Sync-Konflikte{{else}}Sync-Konflikt: {{.FilePath}}{{end}}

@@ -1,0 +1,9 @@
+Share revoked — PrivaSync
+
+Hi {{.Username}},
+
+{{.SharerName}} revoked the share of {{.FileName}}.
+You no longer have access to this file. Local copies on your devices
+remain in place.
+
+— PrivaSync

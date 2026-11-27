@@ -1,0 +1,15 @@
+E-Mail-Adresse geändert — PrivaSync
+
+Hallo {{.Username}},
+
+die E-Mail-Adresse deines PrivaSync-Kontos wurde von
+{{.OldEmail}} auf {{.NewEmail}} geändert.
+
+Diese Bestätigung erreicht dich nochmal an der bisherigen
+Adresse.
+
+Wenn du diese Änderung nicht selbst durchgeführt hast,
+melde dich umgehend bei deinem Administrator und setze dein
+Passwort zurück.
+
+— PrivaSync

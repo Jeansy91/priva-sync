@@ -1,0 +1,13 @@
+Email address changed — PrivaSync
+
+Hello {{.Username}},
+
+The email address on your PrivaSync account was changed
+from {{.OldEmail}} to {{.NewEmail}}.
+
+This notice is sent to the previous address as well.
+
+If you did not make this change, contact your administrator
+and reset your password immediately.
+
+— PrivaSync

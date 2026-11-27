@@ -1,0 +1,17 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;">Sync-Konflikt</h1>
+<p style="margin:0 0 16px;">Hallo {{.Username}},</p>
+{{if gt .Count 1}}
+<p style="margin:0 0 16px;">beim Synchronisieren gab es <strong>{{.Count}} Konflikte</strong>. Die betroffenen Dateien wurden lokal jeweils unter einem neuen Namen gesichert — du musst entscheiden welche Version behalten werden soll.</p>
+
+<div style="background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;padding:12px 16px;margin:16px 0;font-family:monospace;font-size:14px;">{{range .FilePaths}}<div>{{.}}</div>{{end}}</div>
+{{else}}
+<p style="margin:0 0 16px;">beim Synchronisieren einer deiner Dateien gab es einen Konflikt. Die Datei wurde lokal unter einem neuen Namen gesichert — du musst entscheiden welche Version behalten werden soll.</p>
+
+<div style="background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;padding:12px 16px;margin:16px 0;font-family:monospace;font-size:14px;">{{.FilePath}}</div>
+{{end}}
+
+<p style="margin:24px 0;">
+  <a href="{{.ConflictsURL}}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Konflikt lösen</a>
+</p>
+{{end}}

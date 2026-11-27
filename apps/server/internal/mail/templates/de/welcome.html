@@ -1,0 +1,20 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;">Willkommen, {{.Username}}!</h1>
+<p style="margin:0 0 16px;">Ein Administrator hat ein Konto für dich auf PrivaSync angelegt.</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;background:#f9fafb;border-radius:6px;padding:0;width:100%;">
+  <tr><td style="padding:12px 16px;"><strong>Benutzername:</strong> {{.Username}}</td></tr>
+  <tr><td style="padding:0 16px 12px;"><strong>E-Mail:</strong> {{.Email}}</td></tr>
+</table>
+
+<p style="margin:16px 0;">Klicke auf den Button unten und wähle dein eigenes Passwort. Der Link ist <strong>{{.ExpiresIn}}</strong> gültig.</p>
+
+<p style="margin:24px 0 0;">
+  <a href="{{.InviteURL}}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Passwort festlegen</a>
+</p>
+
+<p style="margin:16px 0 0;font-size:13px;color:#666;">Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+<span style="word-break:break-all;font-family:monospace;font-size:12px;">{{.InviteURL}}</span></p>
+
+<p style="margin:16px 0 0;font-size:13px;color:#666;">Sollte der Link abgelaufen sein, fordere über „Passwort vergessen“ auf der Login-Seite einen neuen an.</p>
+{{end}}

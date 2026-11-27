@@ -1,0 +1,11 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;">New share for you</h1>
+<p style="margin:0 0 16px;">Hi {{.Username}},</p>
+<p style="margin:0 0 16px;"><strong>{{.SharerName}}</strong> shared a file with you:</p>
+
+<div style="background:#f9fafb;border-radius:6px;padding:12px 16px;margin:16px 0;font-family:monospace;font-size:14px;">{{.FileName}}</div>
+
+<p style="margin:24px 0;">
+  <a href="{{.ShareURL}}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Open file</a>
+</p>
+{{end}}

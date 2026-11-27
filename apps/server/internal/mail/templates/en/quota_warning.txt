@@ -1,0 +1,13 @@
+Storage at {{.Percentage}}% — PrivaSync
+
+Hi {{.Username}},
+
+your PrivaSync storage is {{.Percentage}}% full:
+
+  Used:    {{formatBytes .UsedBytes}}
+  Quota:   {{formatBytes .QuotaBytes}}
+
+Free up space or contact your administrator for more storage:
+{{.BaseURL}}/files
+
+— PrivaSync

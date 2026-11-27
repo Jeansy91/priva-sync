@@ -1,0 +1,10 @@
+# Build/release tooling -- not shipped, subprocess use is expected.
+scripts/
+
+# Generated code (kept in sync via CI gates, not hand-authored).
+**/events.gen.ts
+
+# Test files -- fixtures often trip taint rules with intentional patterns.
+**/*.test.ts
+**/*.test.tsx
+**/*_test.go

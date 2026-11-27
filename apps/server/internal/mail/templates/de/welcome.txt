@@ -1,0 +1,14 @@
+Willkommen bei PrivaSync, {{.Username}}!
+
+Ein Administrator hat ein Konto für dich angelegt.
+
+  Benutzername:  {{.Username}}
+  E-Mail:        {{.Email}}
+
+Lege über diesen Link dein eigenes Passwort fest (gültig {{.ExpiresIn}}):
+{{.InviteURL}}
+
+Sollte der Link abgelaufen sein, fordere über „Passwort vergessen“ auf
+der Login-Seite einen neuen an.
+
+— PrivaSync

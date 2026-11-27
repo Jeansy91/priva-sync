@@ -1,0 +1,6 @@
+{{define "footer"}}{{if .OptIn -}}
+Du erhältst diese Mail, weil E-Mail-Benachrichtigungen in deinen Einstellungen aktiviert sind.
+Abbestellen unter <a href="{{.BaseURL}}/settings" style="color:#2563eb;">Einstellungen</a>.
+{{- else -}}
+Diese Mail wurde automatisch generiert und betrifft dein PrivaSync-Konto. Nicht antworten.
+{{- end}}{{end}}

@@ -1,0 +1,80 @@
+# Weekly dependency updates, Mondays 06:00 Berlin time. Minor and patch
+# updates are grouped into one PR per ecosystem; majors come as single PRs.
+version: 2
+updates:
+  # pnpm workspace in the repository root (apps/* and packages/*).
+  # The security overrides in pnpm-workspace.yaml are minimum versions, not
+  # dependencies, and are not touched by Dependabot.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /apps/server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      gomod-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /apps/desktop/src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # windows-core must match the version the `windows` crate brings along
+      # (windows 0.62 -> windows-core 0.62), but windows-core now versions
+      # independently (0.100). Bump it by hand together with `windows`.
+      - dependency-name: windows-core
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]
+
+  # Also keeps the SHA pins in .github/workflows up to date.
+  # Python stays on 3.12.x in the workflow (setup-python version input): the
+  # semgrep-core binary segfaults under Python 3.15. That input is not tracked
+  # by Dependabot, so there is nothing to ignore here; do not raise it blindly.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

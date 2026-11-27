@@ -1,0 +1,55 @@
+# Umgebungsvariablen
+.env
+
+# MCP-Config: maschinenspezifischer Endpoint + Credential, nicht committen
+.mcp.json
+
+# Signing-Keys (Tauri-Updater) — NIEMALS committen
+.tauri/
+*.key
+*.key.pub
+
+# Build-Artefakte
+dist/
+apps/server/server
+apps/desktop/src-tauri/target/
+apps/desktop/shell/target/
+*.tsbuildinfo
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Go
+apps/server/**/*.exe
+apps/server/coverage.out
+apps/server/coverage.html
+
+# Coverage-Reports (Issue #85)
+coverage/
+apps/desktop/src-tauri/target/llvm-cov/
+
+# Python
+__pycache__/
+
+# Daten & Logs
+data/
+pgdata/
+*.log
+security-audit-report-*.md
+zap-report.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code — lokale, projekt-spezifische Secrets/Overrides
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VSCode/Delve debug binaries (Windows)
+apps/server/cmd/server/__debug_bin*.exe*

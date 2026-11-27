@@ -1,0 +1,12 @@
+# Normalize all text files to LF in the index; working-tree EOL follows
+# core.autocrlf. Ends the recurring CRLF-only "modified" noise on generated
+# files (gen/schemas) between Windows checkouts and build tooling.
+* text=auto
+
+# Shell scripts must stay LF even on Windows checkouts.
+*.sh text eol=lf
+
+# Binary assets — never EOL-converted or diffed as text.
+*.png  binary
+*.ico  binary
+*.icns binary

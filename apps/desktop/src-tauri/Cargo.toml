@@ -1,0 +1,92 @@
+[package]
+name    = "privasync-desktop"
+version = "0.17.0"
+edition = "2021"
+
+[[bin]]
+name = "privasync-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri                     = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+tauri-plugin-shell        = "2"
+tauri-plugin-dialog       = "2"
+tauri-plugin-updater      = "2"
+tauri-plugin-autostart    = "2"
+tauri-plugin-deep-link    = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+serde                     = { version = "1", features = ["derive"] }
+serde_json                = "1"
+tokio                     = { version = "1", features = ["full"] }
+tokio-util                = { version = "0.7", features = ["io"] }
+reqwest                   = { version = "0.13", features = ["json", "stream"] }
+notify                    = "7"
+rusqlite                  = { version = "0.41", features = ["bundled"] }
+blake3                    = "1"
+fs2                       = "0.4"
+base64                    = "0.23"
+walkdir                   = "2"
+ignore                    = "0.4"
+anyhow                    = "1"
+tracing                   = "0.1"
+tracing-subscriber        = { version = "0.3", features = ["env-filter"] }
+tracing-appender          = "0.2"
+chrono                    = { version = "0.4", features = ["serde"] }
+urlencoding               = "2"
+bytes                     = "1"
+futures-util              = "0.3"
+uuid                      = { version = "1", features = ["v4"] }
+hex                       = "0.4"
+unicode-normalization     = "0.1"
+url                       = "2"
+rust-i18n                 = "3"
+os_info                   = { version = "3", default-features = false }
+gethostname               = "0.5"
+
+[dev-dependencies]
+mockito = "1"
+tempfile = "3"
+# start_paused = true in the with_retry_throttled backoff test — dev-only,
+# does not affect the release binary's feature set.
+tokio = { version = "1", features = ["test-util"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Storage_CloudFilters",
+    "Win32_Storage_FileSystem",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_IO",
+    "Win32_System_Com",
+    "Win32_System_Registry",
+    "Win32_System_CorrelationVector",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    # SHGetFileInfoW/SHFILEINFOW are gated on it (they carry an HICON).
+    "Win32_UI_WindowsAndMessaging",
+    # WinRT — needed for StorageProviderSyncRootManager (the only documented
+    # path for non-MSIX Win32 apps to register a Cloud Files provider so the
+    # Explorer Status column actually reflects sync state).
+    "Foundation",
+    "Foundation_Collections",
+    "Storage",
+    "Storage_Provider",
+    "Storage_Search",
+    "Storage_Streams",
+    "Security_Cryptography",
+    # UI_Notifications + Data_Xml_Dom — direct WinRT toast construction for
+    # the sync-summary notification (tag/group replace-in-place; the
+    # notification plugin's desktop backend drops both on Windows).
+    "UI_Notifications",
+    "Data_Xml_Dom",
+] }
+
+[profile.release]
+opt-level = 3
+lto       = true
+strip     = true

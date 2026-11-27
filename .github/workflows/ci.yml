@@ -1,0 +1,827 @@
+name: CI
+
+# One workflow, and for a release one run (ADR-0054). Pull requests and pushes
+# to main run the gates; a push to main that carries a version bump goes on to
+# tag the commit and publish it, in that same run.
+#
+# Publishing happens inside a run that already went through every gate, so
+# there is no tag-shaped way around them.
+#
+# No tag trigger. A tag is a *result*, written by `tag-release` below. A ref
+# created with GITHUB_TOKEN raises no further workflow run anyway, which is
+# exactly why the publish jobs live in this run and not in a second one.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Pull-request runs are superseded by newer pushes. Runs on main are never
+# cancelled: a release publishes from a main run, and a half-pushed image is
+# worse than a duplicate run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # ════════════════════════════ Gates: tests ════════════════════════════
+  # Job names carry the block: test-* and sec-*. The workflow syntax has no
+  # grouping primitive, so the prefix keeps the blocks legible in a run
+  # overview. Toolchain versions are pinned exactly (bump deliberately, in a
+  # commit that says so).
+
+  test-go:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: privasync
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: privasync
+        # The job runs on the runner host, so the service is reached on
+        # localhost via the mapped port.
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U privasync -d privasync"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.27.4'
+
+      # Pinned, like every other tool here. `@latest` means the toolchain
+      # changes under us. For tygo the stakes are high: this gate compares
+      # generated output, so a new generator version fails it without any Go
+      # struct changing.
+      - name: Install tygo
+        run: go install github.com/gzuidhof/tygo@v0.2.21
+
+      # Cheapest gate first: a drifted events.gen.ts is a one-line fix and
+      # there is no point spending four minutes of test time to find out.
+      - name: Verify events.gen.ts is in sync with Go structs
+        run: make gen-events-check
+
+      # ── Coverage gate ──────────────────────────────────────
+      # Thresholds are measured baselines (2026-07-31), not target values --
+      # see docs/development.md "Testabdeckung" + the coverage notes there. Raise only, never
+      # lower.
+      #
+      # -p 1: tests share one Postgres DB across packages -- parallel
+      # packages cause interference (counter deltas, file renames).
+      # -coverpkg=./...: credits code exercised indirectly through other
+      # packages' tests (repository/storage driven by handler tests etc).
+      - name: Run tests with coverage
+        working-directory: apps/server
+        env:
+          TEST_DATABASE_URL: postgres://privasync:ci-test-only@localhost:5432/privasync
+        run: go test ./... -p 1 -timeout 20m -coverpkg=./... -coverprofile=coverage.out -covermode=atomic
+
+      - name: Check coverage threshold
+        working-directory: apps/server
+        run: bash ../../scripts/check-coverage-go.sh coverage.out 80
+
+      - name: HTML coverage report
+        if: always()
+        working-directory: apps/server
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: server-coverage
+          path: apps/server/coverage.html
+
+  # All TypeScript suites share one checkout and one pnpm install.
+  # `if: always()` on the later steps keeps the diagnostics of separate jobs:
+  # a failing web suite must not hide a failing desktop one.
+  test-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.9
+
+      - run: pnpm install --frozen-lockfile
+
+      # Thresholds are enforced inside each vitest.config.ts.
+      - name: Test @privasync/web with coverage
+        run: pnpm --filter @privasync/web exec vitest run --coverage
+
+      - name: Test @privasync/desktop with coverage
+        if: always()
+        run: pnpm --filter @privasync/desktop exec vitest run --coverage
+
+      - name: Test @privasync/ui with coverage
+        if: always()
+        run: pnpm --filter @privasync/ui exec vitest run --coverage
+
+      - name: Test @privasync/i18n with coverage
+        if: always()
+        run: pnpm --filter @privasync/i18n exec vitest run --coverage
+
+      - name: Test @privasync/api-client with coverage
+        if: always()
+        run: pnpm --filter @privasync/api-client exec vitest run --coverage
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: web-coverage
+          path: apps/web/coverage
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: desktop-ts-coverage
+          path: apps/desktop/coverage
+
+  test-desktop-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+
+      # Tauri v2 links against system WebKitGTK/GTK; without these the
+      # `javascriptcore-rs-sys` build script fails at pkg-config and the whole
+      # job dies before any test runs.
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            build-essential \
+            file
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+
+      # Baseline measured 2026-08-02 (Runde 5): 50.2% lines -- AC target is 60%.
+      - name: Test with coverage gate (threshold, see docs/development.md)
+        working-directory: apps/desktop/src-tauri
+        run: cargo llvm-cov --locked --fail-under-lines 58 --html
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: desktop-rust-coverage
+          path: apps/desktop/src-tauri/target/llvm-cov/html
+
+  # ═══════════════════════════ Gates: security ═══════════════════════════
+
+  # gosec and gitleaks both want a Go toolchain and nothing else.
+  sec-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.27.4'
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
+
+      # Module path is github.com/zricethezav/gitleaks/v8 -- the go.mod still
+      # declares the original path even though the repo moved to the gitleaks
+      # org, so `go install github.com/gitleaks/...` fails with a
+      # path-mismatch.
+      - name: Install gitleaks
+        run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
+
+      - name: Run gosec
+        working-directory: apps/server
+        # Excluded rules are noise/convention for this codebase (see ADR-0030):
+        # G104 best-effort cleanup (Close/Remove), G301/302/306/307 file-perm
+        # conventions, G204/G304 heuristic exec/path rules superseded by the
+        # taint-based G702/G703 (kept). The remaining genuine G7xx/G124/G120
+        # findings are tracked for review (ADR-0031) -- do NOT widen this list to
+        # silence them.
+        run: gosec -exclude=G104,G204,G301,G302,G304,G306,G307 ./...
+
+      # always(), so a gosec finding cannot hide a leak. The guard covers the
+      # other direction: with the install above failed, this step would end the
+      # log with "gitleaks: command not found" while the real error sits far
+      # higher up.
+      - name: Run gitleaks
+        if: always()
+        run: |
+          command -v gitleaks >/dev/null || {
+            echo "gitleaks was never installed -- see the failing step above"
+            exit 1
+          }
+          gitleaks detect --source . --no-git
+
+  sec-cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        working-directory: apps/desktop/src-tauri
+        # quick-xml RUSTSEC-2026-0194/0195 (attribute/namespace DoS) are pinned
+        # transitively by Tauri (plist ^0.38, tauri-winrt-notification ^0.37);
+        # 0.41 is not semver-reachable until upstream bumps. Tracked in ADR-0031.
+        # Every other advisory is fixed via `cargo update` (rustls-webpki,
+        # crossbeam-epoch); the 23 unmaintained/unsound warnings are non-failing.
+        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
+
+  sec-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run pnpm audit
+        # --prod scopes to shipped dependencies. The prod-high advisories
+        # (react-router DoS/CSRF, @xmldom/xmldom XML-injection) are fixed via
+        # upgrade; the remaining high advisories are dev-tooling only
+        # (vitest/vite/postcss/nanoid, esbuild) and never reach the deployed
+        # artifact -- tracked for periodic upgrade (see ADR-0030).
+        run: pnpm audit --prod --audit-level=high
+
+  sec-semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Stays on Python 3.12.x: semgrep-core segfaults under Python 3.15.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.14'
+
+      - name: Install semgrep
+        run: pip install semgrep
+
+      - name: Run semgrep
+        # Build scripts, generated code and tests are in .semgrepignore.
+        # Remaining genuine app findings (cookie-secure, XSS, filepath-clean)
+        # are tracked for review. See ADR-0030.
+        run: semgrep --config=p/owasp-top-ten --error .
+
+  sec-trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Built through buildx against the same layer cache the server-image job
+      # reads, so on a release run the image is paid for once. `load: true`
+      # puts it in the local daemon, which is where trivy looks for it.
+      - name: Build server image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context:    .
+          file:       Dockerfile
+          load:       true
+          tags:       privasync-server:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Install trivy
+        # Pin the release and verify its checksum before installing the binary.
+        run: |
+          set -eu
+          version=0.76.2
+          archive="trivy_${version}_Linux-64bit.tar.gz"
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
+            "https://get.trivy.dev/trivy?os=Linux&arch=64bit&version=${version}&type=tar.gz&client=install-script" \
+            --output "${temp_dir}/${archive}"
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
+            "https://github.com/aquasecurity/trivy/releases/download/v${version}/trivy_${version}_checksums.txt" \
+            --output "${temp_dir}/checksums.txt"
+          grep -E "^[[:xdigit:]]{64}[[:space:]]+\\*?${archive}$" "${temp_dir}/checksums.txt" \
+            > "${temp_dir}/archive.sha256"
+          (cd "$temp_dir" && sha256sum --check --strict archive.sha256)
+          tar -xzf "${temp_dir}/${archive}" -C "$temp_dir" trivy
+          sudo install -m 0755 "${temp_dir}/trivy" /usr/local/bin/trivy
+
+      - name: Scan image
+        # Vuln DB from the AWS ECR mirror, which avoids the rate limits of
+        # pulling it from ghcr.
+        run: |
+          trivy image \
+            --db-repository public.ecr.aws/aquasecurity/trivy-db \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --no-progress \
+            privasync-server:latest
+
+  # ══════════════════════════════ Release ═══════════════════════════════
+  # One run does all of it (ADR-0054): the gates above, then the tag, then the
+  # build and publish jobs, all inside the push of the release commit to main.
+  # Nothing here is reachable without having passed every gate first.
+  #
+  # Order (ADR-0088): client builds (desktop-*) -> publish-client-release ->
+  # server-image. The server image embeds a manifest with the updater
+  # signatures of the published client assets, so it can only be built once
+  # the clients exist. A pull request builds the server image only as the
+  # trivy smoke build (sec-trivy) with the empty, checked-in manifest.
+
+  # ── Tag the commit once every gate is green ──────────────────────────────
+  # `tagged` is what the build jobs key off. It says a *new* tag was written in
+  # this run, so an ordinary commit to main, whose version is already tagged,
+  # publishes nothing, and only a version bump does.
+  #
+  # `make release` therefore just pushes the branch: the bump in the manifests
+  # is the release trigger, and this job turns it into a tag.
+  tag-release:
+    needs: [test-go, test-node, test-desktop-rust,
+            sec-go, sec-cargo-audit, sec-node, sec-semgrep, sec-trivy]
+    # Never from pull requests or other branches.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # The workflow grants contents:read; writing a ref needs more, and only
+    # this job needs it.
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      tagged:  ${{ steps.tag.outputs.TAGGED }}
+      version: ${{ steps.v.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The manifest is the single source of the version (scripts/bump-version.sh
+      # writes all of them from one value), so the tag follows the code rather
+      # than a commit-message convention that a hand-written commit could get
+      # wrong.
+      - name: Read version from the desktop manifest
+        id: v
+        run: |
+          VERSION=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([0-9]*\.[0-9]*\.[0-9]*\)".*/\1/p' \
+            apps/desktop/package.json | head -1)
+          test -n "$VERSION" || { echo "::error::no version in apps/desktop/package.json"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Created through the REST API (a lightweight tag on the run's commit).
+      # Only a 404 means "does not exist yet"; any other failure fails the job
+      # rather than being mistaken for it.
+      - name: Create the tag when it does not exist yet
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION:  ${{ steps.v.outputs.VERSION }}
+        run: |
+          if out=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" 2>&1); then
+            echo "v${VERSION} already exists - not a release commit, publishing nothing"
+            echo "TAGGED=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$out" in
+            *"HTTP 404"*) ;;
+            *) echo "::error::tag lookup failed: $out"; exit 1 ;;
+          esac
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/v${VERSION}" -f sha="${GITHUB_SHA}"
+          echo "tagged ${GITHUB_SHA} as v${VERSION}"
+          echo "TAGGED=true" >> "$GITHUB_OUTPUT"
+
+  # ── 1/3: Desktop-Binaries ────────────────────────────────────────────────
+  # Linux-Bundles (AppImage/deb) — nativ auf dem Runner.
+  desktop-linux:
+    if: needs.tag-release.outputs.tagged == 'true'
+    needs: [tag-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # xdg-utils liefert xdg-mime, das der AppImage-Bundler aufruft. Ohne das
+      # Paket laufen deb und rpm durch und erst das AppImage bricht ab —
+      # "xdg-mime binary not found", ganz am Ende eines mehrminuetigen Builds.
+      - name: Install Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libayatana-appindicator3-dev \
+            xdg-utils
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.9
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri bundles
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build
+
+      - name: Upload bundles as artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-linux-x86_64-${{ needs.tag-release.outputs.version }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+
+  # Windows-Bundle — Cross-Build auf einem Linux-Runner, kein Windows-Host.
+  #
+  # Ergebnis ist NSIS (*-setup.exe), keine MSI: WiX ist Windows-Software. Fuer
+  # den Updater ist das kein Verlust, NSIS ist dort das empfohlene Format.
+  #
+  # Die Updater-Signatur (Ed25519) erzeugt Tauri selbst in Rust und damit auch
+  # hier. Die Warnung "Signing ... only supported on Windows hosts" im Log
+  # betrifft Authenticode, das dieses Projekt bewusst nicht nutzt.
+  desktop-windows:
+    if: needs.tag-release.outputs.tagged == 'true'
+    needs: [tag-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # nsis: der Bundler. clang/lld: Linker fuer das MSVC-Ziel.
+      # libayatana-appindicator3-dev sieht hier falsch aus, ist aber noetig:
+      # tauri-cli prueft die Bibliothek auf Linux-Hosts unabhaengig vom
+      # Zielsystem und paniert sonst mit "Can't detect any appindicator
+      # library", bevor das Bundling beginnt.
+      - name: Install cross-build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            nsis \
+            clang \
+            lld \
+            llvm \
+            libayatana-appindicator3-dev
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.9
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      # Liefert die MSVC-CRT- und SDK-Header nach, die auf Linux fehlen.
+      - name: Install cargo-xwin
+        run: cargo install cargo-xwin --locked
+
+      # Bewusst die Rust-CLI statt `pnpm tauri`: das Linux-Binary der
+      # npm-CLI kennt nur die Linux-Bundle-Typen und lehnt `--bundles nsis`
+      # ab ("invalid value 'nsis', possible values: deb, rpm, appimage").
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.14'
+
+      - name: Install sparse-package tooling
+        run: python -m pip install -r apps/desktop/requirements-msix.txt
+
+      - name: Verify sparse-package signing secrets
+        env:
+          PRIVASYNC_APPX_SIGNING_PFX_BASE64: ${{ secrets.PRIVASYNC_APPX_SIGNING_PFX_BASE64 }}
+          PRIVASYNC_APPX_SIGNING_PASSWORD: ${{ secrets.PRIVASYNC_APPX_SIGNING_PASSWORD }}
+        run: |
+          test -n "$PRIVASYNC_APPX_SIGNING_PFX_BASE64" || {
+            echo "::error::PRIVASYNC_APPX_SIGNING_PFX_BASE64 is required"
+            exit 1
+          }
+          test -n "$PRIVASYNC_APPX_SIGNING_PASSWORD" || {
+            echo "::error::PRIVASYNC_APPX_SIGNING_PASSWORD is required"
+            exit 1
+          }
+
+      - name: Build Windows bundle
+        working-directory: apps/desktop
+        env:
+          TAURI_ENV_PLATFORM:                     windows
+          TAURI_ENV_TARGET_TRIPLE:                 x86_64-pc-windows-msvc
+          TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PRIVASYNC_APPX_SIGNING_PFX_BASE64:   ${{ secrets.PRIVASYNC_APPX_SIGNING_PFX_BASE64 }}
+          PRIVASYNC_APPX_SIGNING_PASSWORD:     ${{ secrets.PRIVASYNC_APPX_SIGNING_PASSWORD }}
+        run: cargo tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+
+      - name: Upload bundle as artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-windows-x86_64-${{ needs.tag-release.outputs.version }}
+          path: |
+            apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+            apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe.sig
+          if-no-files-found: error
+
+  # macOS bundles — native on a macOS runner, one job per architecture. Two
+  # separate targets instead of a universal binary: the Tauri updater looks up
+  # darwin-aarch64 / darwin-x86_64 by the platform key, which a universal
+  # build does not map cleanly.
+  #
+  # Output: .dmg for the first install and PrivaSync.app.tar.gz (+ .sig) as the
+  # updater archive. No Apple code signing or notarization yet (the bundle is
+  # ad-hoc signed, see signingIdentity "-" in tauri.conf.json); first launch
+  # goes through Gatekeeper. To add it later, import a Developer ID certificate
+  # into a temporary keychain here and pass APPLE_CERTIFICATE,
+  # APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY, APPLE_ID,
+  # APPLE_PASSWORD and APPLE_TEAM_ID to the build step. The updater signature
+  # (Ed25519) is independent of that and already applied.
+  desktop-macos:
+    if: needs.tag-release.outputs.tagged == 'true'
+    needs: [tag-release]
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch:   aarch64
+            target: aarch64-apple-darwin
+          - arch:   x86_64
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.9
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build macOS bundles
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles app,dmg
+
+      - name: Upload bundles as artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-macos-${{ matrix.arch }}-${{ needs.tag-release.outputs.version }}
+          path: |
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
+          if-no-files-found: error
+
+  # ── 2/3: GitHub release with named assets ────────────────────────────────
+  # The release assets are what clients download: the server's update feed
+  # points straight at them (ADR-0088). The asset names below are therefore a
+  # contract with scripts/build-client-manifest.sh and the server's manifest.
+  publish-client-release:
+    if: needs.tag-release.outputs.tagged == 'true'
+    needs: [tag-release, desktop-linux, desktop-windows, desktop-macos]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-linux-x86_64-${{ needs.tag-release.outputs.version }}
+          path: dl-linux
+
+      - name: Download Windows bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-windows-x86_64-${{ needs.tag-release.outputs.version }}
+          path: dl-windows
+
+      - name: Download macOS bundle (Apple Silicon)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-macos-aarch64-${{ needs.tag-release.outputs.version }}
+          path: dl-macos-aarch64
+
+      - name: Download macOS bundle (Intel)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-macos-x86_64-${{ needs.tag-release.outputs.version }}
+          path: dl-macos-x86_64
+
+      # Explicit target in the filename (ADR-0068 point 6, kept by ADR-0088):
+      # privasync-<os>-<arch>[-setup].<ext>. The macOS .app.tar.gz is the
+      # updater archive, the .dmg the first-install image.
+      - name: Stage release assets with target-named filenames
+        run: |
+          mkdir -p release-assets
+          pick() { find "$1" -name "$2" | head -1; }
+
+          linux_bundle=$(pick dl-linux '*.AppImage')
+          windows_bundle=$(pick dl-windows '*-setup.exe')
+          test -n "$linux_bundle"   || { echo "::error::no AppImage in linux artifact"; exit 1; }
+          test -n "$windows_bundle" || { echo "::error::no setup.exe in windows artifact"; exit 1; }
+
+          cp "$linux_bundle"       release-assets/privasync-linux-x86_64.AppImage
+          cp "$linux_bundle.sig"   release-assets/privasync-linux-x86_64.AppImage.sig
+          cp "$windows_bundle"     release-assets/privasync-windows-x86_64-setup.exe
+          cp "$windows_bundle.sig" release-assets/privasync-windows-x86_64-setup.exe.sig
+
+          for arch in aarch64 x86_64; do
+            dmg=$(pick "dl-macos-$arch" '*.dmg')
+            archive=$(pick "dl-macos-$arch" '*.app.tar.gz')
+            test -n "$dmg"     || { echo "::error::no dmg in macos $arch artifact"; exit 1; }
+            test -n "$archive" || { echo "::error::no app.tar.gz in macos $arch artifact"; exit 1; }
+            cp "$dmg"         "release-assets/privasync-darwin-$arch.dmg"
+            cp "$archive"     "release-assets/privasync-darwin-$arch.app.tar.gz"
+            cp "$archive.sig" "release-assets/privasync-darwin-$arch.app.tar.gz.sig"
+          done
+
+      # Not draft: a draft is invisible to anonymous downloads, and the
+      # updater URLs of the server image must resolve as soon as it is
+      # published. The tag already exists (tag-release).
+      - name: Create GitHub release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION:  ${{ needs.tag-release.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" release-assets/*             --repo "${GITHUB_REPOSITORY}"             --verify-tag             --title "v${VERSION}"             --generate-notes             --latest
+
+      # Only the signatures travel on: the server-image job turns them into
+      # the embedded manifest (the binaries are not needed there).
+      - name: Hand the updater signatures to the server-image job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: client-signatures-${{ needs.tag-release.outputs.version }}
+          path: release-assets/*.sig
+          if-no-files-found: error
+
+  # ── 3/3: Server image ────────────────────────────────────────────────────
+  # Last on purpose (ADR-0088): the manifest with the client signatures has to
+  # exist before the image build, and the server must only point clients at
+  # assets that are already published.
+  server-image:
+    if: needs.tag-release.outputs.tagged == 'true'
+    needs: [tag-release, publish-client-release]
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download client signatures
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: client-signatures-${{ needs.tag-release.outputs.version }}
+          path: client-signatures
+
+      # Overwrites the empty manifest in the build context; the Dockerfile
+      # copies apps/server, so the Go build embeds the result.
+      - name: Write the embedded client manifest
+        env:
+          VERSION: ${{ needs.tag-release.outputs.version }}
+        run: |
+          bash scripts/build-client-manifest.sh "$VERSION" client-signatures
+          cat apps/server/internal/clientrelease/manifest.json
+
+      # ghcr.io requires a lowercase repository path.
+      - name: Compute image name
+        id: image
+        run: echo "NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/privasync-server" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context:   .
+          file:      Dockerfile
+          platforms: linux/amd64
+          push:      true
+          build-args: |
+            VERSION=${{ needs.tag-release.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          tags: |
+            ${{ steps.image.outputs.NAME }}:${{ needs.tag-release.outputs.version }}
+            ${{ steps.image.outputs.NAME }}:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max

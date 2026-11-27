@@ -1,0 +1,16 @@
+{{define "body"}}
+<h1 style="margin:0 0 16px;font-size:20px;color:#b91c1c;">Zwei-Faktor-Authentifizierung deaktiviert</h1>
+<p style="margin:0 0 16px;">Hallo {{.Username}},</p>
+<p style="margin:0 0 16px;">soeben wurde die Zwei-Faktor-Authentifizierung für dein PrivaSync-Konto deaktiviert:</p>
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background:#fee2e2;border-radius:6px;margin:16px 0;width:100%;">
+  <tr><td style="padding:12px 16px;"><strong>Zeitpunkt:</strong> {{.When}}</td></tr>
+  <tr><td style="padding:0 16px 12px;"><strong>IP-Adresse:</strong> {{.IPAddress}}</td></tr>
+</table>
+
+<p style="margin:16px 0;"><strong>Warst du das nicht?</strong> Ändere sofort dein Passwort und aktiviere 2FA erneut.</p>
+
+<p style="margin:24px 0;">
+  <a href="{{.BaseURL}}/settings" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;">Zu den Einstellungen</a>
+</p>
+{{end}}

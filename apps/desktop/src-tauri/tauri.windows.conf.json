@@ -1,0 +1,17 @@
+{
+  "bundle": {
+    "resources": {
+      "../shell/target/x86_64-pc-windows-msvc/release/privasync_shell.dll": "privasync_shell.dll",
+      "target/sparse-package/privasync-identity.msix": "privasync-identity.msix",
+      "target/sparse-package/privasync-package.cer": "privasync-package.cer",
+      "icons/menu/": "menu-icons/",
+      "register-context-menu.ps1": "register-context-menu.ps1",
+      "register-context-menu-elevated.ps1": "register-context-menu-elevated.ps1"
+    },
+    "windows": {
+      "wix": {
+        "fragmentPaths": ["wix/context-menu.wxs"]
+      }
+    }
+  }
+}

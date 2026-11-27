@@ -1,0 +1,13 @@
+Speicherplatz {{.Percentage}}% belegt — PrivaSync
+
+Hallo {{.Username}},
+
+dein PrivaSync-Speicher ist zu {{.Percentage}}% belegt:
+
+  Belegt:    {{formatBytes .UsedBytes}}
+  Quota:     {{formatBytes .QuotaBytes}}
+
+Räume Platz auf oder kontaktiere deinen Administrator für mehr
+Speicher: {{.BaseURL}}/files
+
+— PrivaSync

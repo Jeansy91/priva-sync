@@ -1,0 +1,14 @@
+Welcome to PrivaSync, {{.Username}}!
+
+An administrator has created an account for you.
+
+  Username:  {{.Username}}
+  Email:     {{.Email}}
+
+Choose your own password via this link (valid for {{.ExpiresIn}}):
+{{.InviteURL}}
+
+If the link has expired, request a new one via "Forgot password" on the
+login page.
+
+— PrivaSync

@@ -1,0 +1,47 @@
+# Git + IDE
+.git
+.github
+.vscode
+.idea
+
+# Node / pnpm — installiert im Image frisch
+node_modules
+**/node_modules
+.pnpm-store
+
+# Build-Artefakte — werden im Image neu gebaut
+apps/web/dist
+apps/web/tsconfig.tsbuildinfo
+apps/server/server
+apps/desktop
+packages/**/dist
+packages/**/tsconfig.tsbuildinfo
+**/*.tsbuildinfo
+
+# Daten & Logs
+data
+pgdata
+*.log
+security-audit-report-*.md
+
+# Secrets — NIEMALS ins Image
+.env
+.env.*
+!.env.example
+.tauri
+*.key
+*.key.pub
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Mobile (separates Artefakt)
+mobile
+
+# Docs / Meta
+README.md
+SPEC.md
+docker-compose*.yml
+Dockerfile
+.dockerignore
