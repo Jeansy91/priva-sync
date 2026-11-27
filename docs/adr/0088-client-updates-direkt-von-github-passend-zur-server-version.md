@@ -81,6 +81,16 @@ Clients stammen.
 und `.app.tar.gz` mit `.sig` (Updater). Ohne Apple-Zertifikat, nur Ad-hoc-Signatur; Apple-Signierung
 und Notarisierung lassen sich später im Job ergänzen.
 
+**Download-Endpunkt für die Web-Seite.** Die Updater-Artefakte sind nicht das, was ein Mensch
+installiert (macOS: `.app.tar.gz` statt `.dmg`). Das Manifest führt deshalb je Plattform zusätzlich
+`installer` (Windows und Linux: identisch mit `asset`, macOS: die `.dmg`). `build-client-manifest.sh`
+leitet die Namen aus der Namenskonvention ab und bricht ab, wenn ein Installer nicht in der von
+`publish-client-release` mitgelieferten Dateiliste `installers.txt` steht. Der Server liefert
+`GET /api/v1/client/downloads` (öffentlich, gleiches Rate-Limit wie `/updates`) mit
+`{ "version", "release_url", "downloads": [{ "target", "file", "url" }] }`. Bei leerem Manifest
+oder abweichender Version ist `downloads` leer. Die Download-Seite (`/download`) hebt die erkannte
+Plattform hervor und listet die übrigen darunter.
+
 ## Konsequenzen
 
 - **Das Repository muss öffentlich sein.** Der Updater lädt die Assets anonym von GitHub.

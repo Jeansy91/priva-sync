@@ -755,13 +755,19 @@ jobs:
         run: |
           gh release create "v${VERSION}" release-assets/*             --repo "${GITHUB_REPOSITORY}"             --verify-tag             --title "v${VERSION}"             --generate-notes             --latest
 
-      # Only the signatures travel on: the server-image job turns them into
-      # the embedded manifest (the binaries are not needed there).
+      # Only the signatures and the file list travel on: the server-image job
+      # turns them into the embedded manifest (the binaries are not needed
+      # there). installers.txt lets it verify every installer was published.
+      - name: List the published installers
+        run: ls release-assets | grep -v '\.sig$' > release-assets/installers.txt
+
       - name: Hand the updater signatures to the server-image job
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: client-signatures-${{ needs.tag-release.outputs.version }}
-          path: release-assets/*.sig
+          path: |
+            release-assets/*.sig
+            release-assets/installers.txt
           if-no-files-found: error
 
   # ── 3/3: Server image ────────────────────────────────────────────────────

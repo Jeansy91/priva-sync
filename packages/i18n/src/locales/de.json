@@ -867,7 +867,30 @@
     "version": "v{{version}}"
   },
   "downloadPage": {
-    "releaseNotes": "Versionshinweise auf GitHub"
+    "back": "Zurück",
+    "backToLogin": "Zurück zum Login",
+    "title": "PrivaSync Desktop",
+    "subtitle": "Lade den Client für dein Betriebssystem herunter. Updates kommen danach automatisch von deinem Server.",
+    "loading": "Lade Release-Informationen…",
+    "loadError": "Konnte Release-Informationen nicht laden.",
+    "empty": "Dieser Server stellt noch keine Client-Downloads bereit.",
+    "recommended": "Empfohlen für dich",
+    "otherPlatforms": "Andere Plattformen",
+    "allPlatforms": "Verfügbare Plattformen",
+    "downloadVersion": "Version {{version}} herunterladen",
+    "releaseNotes": "Versionshinweise auf GitHub",
+    "platform": {
+      "windows": "Windows · x86_64",
+      "macosArm": "macOS · Apple Silicon",
+      "macosIntel": "macOS · Intel",
+      "linux": "Linux · x86_64"
+    },
+    "hint": {
+      "windows": "Windows zeigt beim ersten Start evtl. SmartScreen: „Weitere Informationen“, dann „Trotzdem ausführen“.",
+      "macos": "Die App ist nicht von Apple signiert: beim ersten Öffnen Rechtsklick auf die App, dann „Öffnen“.",
+      "linux": "AppImage ausführbar machen (chmod +x) und starten."
+    },
+    "updateNote": "Der eingebaute Updater prüft jede Aktualisierung per Signatur, bevor er sie installiert."
   },
   "errors": {
     "INTERNAL_ERROR": "Interner Serverfehler.",

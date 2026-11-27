@@ -71,7 +71,9 @@ ein Cargo-Workspace für den Desktop-Client.
 - Client-Updates: Der Server bietet nur die Client-Version seiner eigenen Version an. Der
   Update-Feed (`/updates/{target}/{version}`) verweist direkt auf die GitHub-Release-Assets;
   Asset-Namen und Signaturen stehen in einem Manifest, das die CI vor dem Image-Build
-  einbettet (ADR-0088). Das Repository muss dafür öffentlich sein.
+  einbettet (ADR-0088). Das Repository muss dafür öffentlich sein. Die Web-Download-Seite
+  (`/download`) listet die Installer aller Plattformen über den öffentlichen Endpunkt
+  `GET /api/v1/client/downloads` (ADR-0088).
 - Der Server-Container läuft als Non-root-User (ADR-0034).
 
 Die Begründung jeder einzelnen Entscheidung steht in der jeweiligen ADR, siehe

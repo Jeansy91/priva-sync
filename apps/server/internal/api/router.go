@@ -121,6 +121,9 @@ func NewRouter(
 		})
 
 		// Public share links.
+		// Installer listing for the web download page (public, rate-limited).
+		r.With(updateRL.Middleware).Get("/client/downloads", updateH.ListDownloads)
+
 		r.Get("/public/shares/{token}", shareH.PublicShare)
 		r.Get("/public/shares/{token}/entries", shareH.PublicShareEntries)
 		r.Get("/public/shares/{token}/download", shareH.PublicShareDownload)

@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -21,11 +22,15 @@ const RepoURL = "https://github.com/Jeansy91/priva-sync"
 //go:embed manifest.json
 var embeddedManifest []byte
 
-// Platform is one updater target's entry: the release asset to download and
-// the content of its Tauri updater signature (.sig) file.
+// Platform is one updater target's entry: the release asset the updater
+// downloads, the content of its Tauri updater signature (.sig) file and the
+// installer a human downloads for a first install. Installer equals Asset on
+// Windows and Linux; on macOS the asset is the updater archive and the
+// installer the .dmg. Installer is optional so older manifests stay valid.
 type Platform struct {
 	Asset     string `json:"asset"`
 	Signature string `json:"signature"`
+	Installer string `json:"installer,omitempty"`
 }
 
 // Manifest is the build-time manifest. Version is the client/server version
@@ -63,6 +68,9 @@ func Parse(data []byte) (Manifest, error) {
 		}
 		if !validAsset(p.Asset) || p.Signature == "" {
 			return Manifest{}, fmt.Errorf("clientrelease: incomplete entry for %q", target)
+		}
+		if p.Installer != "" && !validAsset(p.Installer) {
+			return Manifest{}, fmt.Errorf("clientrelease: invalid installer for %q", target)
 		}
 	}
 	if len(m.Platforms) > 0 && m.Version == "" {
@@ -106,6 +114,50 @@ func (m Manifest) UpdateFor(target, currentVersion, serverVersion string) *Updat
 		URL:       RepoURL + "/releases/download/v" + strings.TrimPrefix(serverVersion, "v") + "/" + p.Asset,
 		Signature: p.Signature,
 	}
+}
+
+// Download is one installer offered on the download page.
+type Download struct {
+	Target string `json:"target"`
+	File   string `json:"file"`
+	URL    string `json:"url"`
+}
+
+// Downloads is the response of the public download listing.
+type Downloads struct {
+	Version    string     `json:"version"`
+	ReleaseURL string     `json:"release_url"`
+	Downloads  []Download `json:"downloads"`
+}
+
+// DownloadsFor lists the installers of every platform in the manifest that
+// has one, sorted by target. It is empty (and version/release_url blank) when
+// the manifest was not built for serverVersion, e.g. in a local dev build.
+func (m Manifest) DownloadsFor(serverVersion string) Downloads {
+	out := Downloads{Downloads: []Download{}}
+	if m.Version == "" || m.Version != serverVersion {
+		return out
+	}
+	tag := "v" + strings.TrimPrefix(serverVersion, "v")
+	targets := make([]string, 0, len(m.Platforms))
+	for t, p := range m.Platforms {
+		if p.Installer != "" {
+			targets = append(targets, t)
+		}
+	}
+	sort.Strings(targets)
+	if len(targets) == 0 {
+		return out
+	}
+	out.Version = strings.TrimPrefix(serverVersion, "v")
+	out.ReleaseURL = RepoURL + "/releases/tag/" + tag
+	for _, t := range targets {
+		f := m.Platforms[t].Installer
+		out.Downloads = append(out.Downloads, Download{
+			Target: t, File: f, URL: RepoURL + "/releases/download/" + tag + "/" + f,
+		})
+	}
+	return out
 }
 
 func validAsset(s string) bool {

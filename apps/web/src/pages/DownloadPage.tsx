@@ -1,188 +1,199 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Apple, ArrowLeft, Download, Loader2, Monitor, Terminal } from 'lucide-react'
+import { Apple, ArrowLeft, Download, ExternalLink, Loader2, Monitor, Terminal } from 'lucide-react'
 import { Button } from '@privasync/ui'
 import { useTranslation } from '@privasync/i18n'
 import { useAuthStore } from '../store/auth'
+import { PageHeader } from '../components/PageHeader'
 
-type Target = 'windows-x86_64' | 'darwin-x86_64' | 'darwin-aarch64' | 'linux-x86_64' | 'linux-aarch64'
+type Target = 'windows-x86_64' | 'darwin-x86_64' | 'darwin-aarch64' | 'linux-x86_64'
 
-interface PlatformArtifact {
-  signature: string
-  url:       string
+const TARGETS: Target[] = ['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64']
+
+interface DownloadEntry {
+  target: string
+  file:   string
+  url:    string
 }
 
-interface Manifest {
-  version:   string
-  pub_date?: string
-  platforms: Record<string, PlatformArtifact>
+// Response of GET /api/v1/client/downloads (public).
+interface DownloadsResponse {
+  version:     string
+  release_url: string
+  downloads:   DownloadEntry[]
 }
 
 function detectTarget(): Target {
   const ua   = navigator.userAgent
   const plat = navigator.platform || ''
 
-  if (/Win/i.test(plat) || /Windows/i.test(ua))     return 'windows-x86_64'
+  if (/Win/i.test(plat) || /Windows/i.test(ua)) return 'windows-x86_64'
   if (/Mac/i.test(plat)) {
-    // arm64 Macs advertise as Intel in userAgent; use userAgentData when available.
-    const arch = (navigator as any).userAgentData?.getHighEntropyValues?.(['architecture'])
-    if (arch?.architecture === 'arm')               return 'darwin-aarch64'
-    if (/ARM|Apple Silicon/i.test(ua))              return 'darwin-aarch64'
-    return 'darwin-x86_64'
+    // The user agent does not reveal Apple Silicon reliably; default to it
+    // unless the UA names Intel explicitly, since current Macs are arm64.
+    if (/Intel/i.test(ua) && !/ARM|Apple Silicon/i.test(ua)) return 'darwin-x86_64'
+    return 'darwin-aarch64'
   }
-  if (/aarch64|arm64/i.test(ua))                    return 'linux-aarch64'
   return 'linux-x86_64'
 }
 
-const TARGET_LABELS: Record<Target, string> = {
-  'windows-x86_64':  'Windows · x86_64',
-  'darwin-x86_64':   'macOS · Intel',
-  'darwin-aarch64':  'macOS · Apple Silicon',
-  'linux-x86_64':    'Linux · x86_64',
-  'linux-aarch64':   'Linux · aarch64',
+const TARGET_LABEL_KEYS: Record<Target, string> = {
+  'windows-x86_64': 'downloadPage.platform.windows',
+  'darwin-aarch64': 'downloadPage.platform.macosArm',
+  'darwin-x86_64':  'downloadPage.platform.macosIntel',
+  'linux-x86_64':   'downloadPage.platform.linux',
+}
+
+const TARGET_HINT_KEYS: Record<Target, string> = {
+  'windows-x86_64': 'downloadPage.hint.windows',
+  'darwin-aarch64': 'downloadPage.hint.macos',
+  'darwin-x86_64':  'downloadPage.hint.macos',
+  'linux-x86_64':   'downloadPage.hint.linux',
 }
 
 function TargetIcon({ target }: { target: Target }) {
-  if (target.startsWith('windows')) return <Monitor   className="h-4 w-4" />
-  if (target.startsWith('darwin'))  return <Apple     className="h-4 w-4" />
+  if (target.startsWith('windows')) return <Monitor className="h-4 w-4" />
+  if (target.startsWith('darwin'))  return <Apple   className="h-4 w-4" />
   return <Terminal className="h-4 w-4" />
 }
 
-const RELEASES_TAG_URL = 'https://github.com/Jeansy91/priva-sync/releases/tag'
+function isTarget(t: string): t is Target {
+  return (TARGETS as string[]).includes(t)
+}
 
 export default function DownloadPage() {
-  const { t }                       = useTranslation()
-  const isAuthenticated             = useAuthStore((s) => s.isAuthenticated)
-  const [detected, setDetected]     = useState<Target>(() => detectTarget())
-  const [manifest, setManifest]     = useState<Manifest | null>(null)
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState<string | null>(null)
+  const { t }               = useTranslation()
+  const isAuthenticated     = useAuthStore((s) => s.isAuthenticated)
+  const detected            = detectTarget()
+  const [data, setData]     = useState<DownloadsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]   = useState(false)
 
   useEffect(() => {
     const ctrl = new AbortController()
     ;(async () => {
-      setLoading(true)
-      setError(null)
       try {
-        const res = await fetch(`/updates/${detected}/0.0.0`, { signal: ctrl.signal })
-        if (res.status === 204) {
-          setManifest(null)
-          return
-        }
+        const res = await fetch('/api/v1/client/downloads', { signal: ctrl.signal })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setManifest(await res.json() as Manifest)
+        setData(await res.json() as DownloadsResponse)
       } catch (err) {
         if ((err as Error).name === 'AbortError') return
-        setError('Konnte Release-Informationen nicht laden.')
+        setError(true)
       } finally {
-        setLoading(false)
+        if (!ctrl.signal.aborted) setLoading(false)
       }
     })()
     return () => ctrl.abort()
-  }, [detected])
+  }, [])
 
-  const primary = manifest?.platforms[detected]
-  const others  = manifest
-    ? (Object.keys(manifest.platforms) as Target[]).filter((t) => t !== detected)
-    : []
+  const entries = (data?.downloads ?? []).filter((d) => isTarget(d.target))
+  const primary = entries.find((d) => d.target === detected)
+  const others  = entries.filter((d) => d !== primary)
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="mx-auto max-w-2xl py-12 space-y-8">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-4xl px-4 pt-8 sm:px-6">
         <Link
           to={isAuthenticated ? '/files' : '/login'}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> {isAuthenticated ? 'Zurück' : 'Zurück zum Login'}
+          <ArrowLeft className="h-3.5 w-3.5" />
+          {isAuthenticated ? t('downloadPage.back') : t('downloadPage.backToLogin')}
         </Link>
+      </div>
+      <PageHeader
+        title={t('downloadPage.title')}
+        subtitle={t('downloadPage.subtitle')}
+        scrolled={false}
+        maxWidth="max-w-4xl"
+      />
 
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">PrivaSync Desktop</h1>
-          <p className="text-muted-foreground">
-            Lade den Client für dein Betriebssystem herunter. Updates installieren sich später automatisch.
-          </p>
-        </div>
-
+      <div className="mx-auto max-w-4xl space-y-6 px-4 pb-12 sm:px-6">
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Lade Release-Informationen…
+            {t('downloadPage.loading')}
           </div>
         )}
 
         {error && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
+            {t('downloadPage.loadError')}
           </div>
         )}
 
-        {!loading && !error && !manifest && (
+        {!loading && !error && entries.length === 0 && (
           <div className="rounded-md border border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
-            Es steht noch kein Release bereit.
+            {t('downloadPage.empty')}
           </div>
         )}
 
-        {manifest && primary && (
+        {data && entries.length > 0 && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Empfohlen für dich</p>
-                  <p className="mt-1 flex items-center gap-2 text-base font-medium">
-                    <TargetIcon target={detected} />
-                    {TARGET_LABELS[detected]}
-                  </p>
+            {primary && (
+              <div className="space-y-3 rounded-lg border border-border bg-card p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {t('downloadPage.recommended')}
+                    </p>
+                    <p className="mt-1 flex items-center gap-2 text-base font-medium">
+                      <TargetIcon target={detected} />
+                      {t(TARGET_LABEL_KEYS[detected])}
+                    </p>
+                  </div>
+                  <Button asChild size="lg">
+                    <a href={primary.url} download>
+                      <Download className="h-4 w-4" />
+                      {t('downloadPage.downloadVersion', { version: data.version })}
+                    </a>
+                  </Button>
                 </div>
-                <Button asChild size="lg">
-                  <a href={primary.url} download>
-                    <Download className="h-4 w-4" />
-                    Version {manifest.version} herunterladen
-                  </a>
-                </Button>
-              </div>
-              <a
-                href={`${RELEASES_TAG_URL}/v${manifest.version}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block border-t border-border pt-4 text-sm text-muted-foreground hover:text-foreground"
-              >
-                {t('downloadPage.releaseNotes')}
-              </a>
-            </div>
-
-            {manifest && primary == null && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Für {TARGET_LABELS[detected]} ist noch kein Build vorhanden. Wähle unten eine andere Plattform.
+                <p className="text-sm text-muted-foreground">{t(TARGET_HINT_KEYS[detected])}</p>
               </div>
             )}
 
             {others.length > 0 && (
-              <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Andere Plattformen</p>
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                  {others.map((t) => (
-                    <a
-                      key={t}
-                      href={manifest.platforms[t].url}
-                      download
-                      className="flex items-center gap-2 rounded-md border border-border
-                                 px-3 py-2 text-sm hover:bg-accent/30"
-                      onClick={() => setDetected(t)}
-                    >
-                      <TargetIcon target={t} />
-                      {TARGET_LABELS[t]}
-                    </a>
-                  ))}
+              <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  {primary ? t('downloadPage.otherPlatforms') : t('downloadPage.allPlatforms')}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {others.map((d) => {
+                    const target = d.target as Target
+                    return (
+                      <div key={d.target} className="space-y-1 rounded-md border border-border px-3 py-2">
+                        <a
+                          href={d.url}
+                          download
+                          className="flex items-center gap-2 text-sm font-medium hover:text-primary"
+                        >
+                          <TargetIcon target={target} />
+                          {t(TARGET_LABEL_KEYS[target])}
+                        </a>
+                        <p className="text-xs text-muted-foreground">{t(TARGET_HINT_KEYS[target])}</p>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
+            )}
+
+            {data.release_url && (
+              <a
+                href={data.release_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t('downloadPage.releaseNotes')}
+              </a>
             )}
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          Nach der Installation signiert der eingebaute Updater jede Aktualisierung mit Ed25519.
-          Bei Erstinstallation zeigt Windows ggf. SmartScreen, macOS den Gatekeeper — beides ist erwartet.
-        </p>
+        <p className="text-xs text-muted-foreground">{t('downloadPage.updateNote')}</p>
       </div>
     </div>
   )

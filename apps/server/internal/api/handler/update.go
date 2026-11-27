@@ -42,3 +42,12 @@ func (h *UpdateHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, u)
 }
+
+// GET /api/v1/client/downloads
+//
+// Public listing of the installers (not the updater archives) of the client
+// build that belongs to this server, one per platform present in the
+// manifest. "downloads" is an empty array for a dev build without manifest.
+func (h *UpdateHandler) ListDownloads(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.manifest.DownloadsFor(h.serverVersion))
+}
