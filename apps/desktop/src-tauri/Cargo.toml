@@ -25,7 +25,7 @@ tokio                     = { version = "1", features = ["full"] }
 tokio-util                = { version = "0.7", features = ["io"] }
 reqwest                   = { version = "0.13", features = ["json", "stream"] }
 notify                    = "7"
-rusqlite                  = { version = "0.41", features = ["bundled"] }
+rusqlite                  = { version = "0.43", features = ["bundled"] }
 blake3                    = "1"
 fs2                       = "0.4"
 base64                    = "0.23"
