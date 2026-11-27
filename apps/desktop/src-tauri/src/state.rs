@@ -331,6 +331,14 @@ pub async fn login(
     if url.is_empty() {
         return Err(CommandError::coded(codes::SERVER_URL_REQUIRED, "server URL must not be empty"));
     }
+    // The password and tokens would travel in clear text; refuse unless the
+    // server is on this machine or a private network.
+    if crate::public_url::is_cleartext_remote(&url) {
+        return Err(CommandError::coded(
+            codes::INSECURE_SERVER_URL,
+            "refusing to send credentials over plain http to a remote host; use https",
+        ));
+    }
 
     {
         let mut client = api.write().await;

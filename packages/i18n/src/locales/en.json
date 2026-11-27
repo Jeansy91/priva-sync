@@ -867,7 +867,30 @@
     "version": "v{{version}}"
   },
   "downloadPage": {
-    "releaseNotes": "Release notes on GitHub"
+    "back": "Back",
+    "backToLogin": "Back to login",
+    "title": "PrivaSync Desktop",
+    "subtitle": "Download the client for your operating system. Updates then come automatically from your server.",
+    "loading": "Loading release information…",
+    "loadError": "Could not load release information.",
+    "empty": "This server does not provide client downloads yet.",
+    "recommended": "Recommended for you",
+    "otherPlatforms": "Other platforms",
+    "allPlatforms": "Available platforms",
+    "downloadVersion": "Download version {{version}}",
+    "releaseNotes": "Release notes on GitHub",
+    "platform": {
+      "windows": "Windows · x86_64",
+      "macosArm": "macOS · Apple Silicon",
+      "macosIntel": "macOS · Intel",
+      "linux": "Linux · x86_64"
+    },
+    "hint": {
+      "windows": "Windows may show SmartScreen on first start: click \"More info\", then \"Run anyway\".",
+      "macos": "The app is not signed by Apple: on first launch, right-click the app and choose \"Open\".",
+      "linux": "Make the AppImage executable (chmod +x) and run it."
+    },
+    "updateNote": "The built-in updater verifies every update by signature before installing it."
   },
   "errors": {
     "INTERNAL_ERROR": "Internal server error.",
@@ -931,6 +954,7 @@
     "SYNC_ROOT_NOT_FOUND": "Sync folder not found.",
     "SYNC_ROOT_ALREADY_EXISTS": "Sync folder already exists.",
     "SERVER_URL_REQUIRED": "Server URL required.",
+    "INSECURE_SERVER_URL": "Unencrypted connection refused. Use an https:// address for remote servers.",
     "SESSION_EXPIRED": "Session expired. Please sign in again.",
     "CONFLICT_COPY_MISSING": "Conflict copy not found.",
     "ON_DEMAND_ON_DRIVE_ROOT": "The folder is a drive root — Windows does not allow cloud files there. The folder syncs in full.",

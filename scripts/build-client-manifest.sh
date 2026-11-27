@@ -7,7 +7,9 @@
 # <sig-dir> holds the Tauri updater signature files named exactly like the
 # GitHub release assets plus ".sig" (e.g. privasync-windows-x86_64-setup.exe.sig).
 # The signature text goes into the manifest, the asset name is the .sig name
-# without the suffix. All platforms below are required: the server image must
+# without the suffix. <sig-dir> also holds installers.txt, the list of file
+# names in the published release (one per line); each installer below must be
+# listed there. All platforms below are required: the server image must
 # not ship with a client that silently lacks a platform.
 #
 # Default output is the embedded manifest in the repo working tree.
@@ -27,6 +29,15 @@ declare -A assets=(
   [darwin-x86_64]="privasync-darwin-x86_64.app.tar.gz"
 )
 
+# Tauri updater target -> installer a human downloads. Same as the updater
+# asset on Windows/Linux; on macOS the .dmg (the updater asset is .app.tar.gz).
+declare -A installers=(
+  [windows-x86_64]="privasync-windows-x86_64-setup.exe"
+  [linux-x86_64]="privasync-linux-x86_64.AppImage"
+  [darwin-aarch64]="privasync-darwin-aarch64.dmg"
+  [darwin-x86_64]="privasync-darwin-x86_64.dmg"
+)
+
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
 
 platforms='{}'
@@ -34,10 +45,13 @@ for target in "${!assets[@]}"; do
   asset="${assets[$target]}"
   sig_file="$sig_dir/$asset.sig"
   [ -s "$sig_file" ] || { echo "missing or empty signature: $sig_file" >&2; exit 1; }
+  installer="${installers[$target]}"
+  grep -qxF "$installer" "$sig_dir/installers.txt" 2>/dev/null \
+    || { echo "installer $installer not listed in $sig_dir/installers.txt" >&2; exit 1; }
   # The .sig file is a single base64 line; drop the trailing newline.
   signature="$(tr -d '\r\n' < "$sig_file")"
-  platforms="$(jq -c --arg t "$target" --arg a "$asset" --arg s "$signature" \
-    '. + {($t): {asset: $a, signature: $s}}' <<<"$platforms")"
+  platforms="$(jq -c --arg t "$target" --arg a "$asset" --arg s "$signature" --arg i "$installer" \
+    '. + {($t): {asset: $a, signature: $s, installer: $i}}' <<<"$platforms")"
 done
 
 jq -n --arg v "$version" --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson p "$platforms" \

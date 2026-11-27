@@ -14,6 +14,7 @@ use crate::api::{ServerError, SessionExpired};
 /// where the meaning is identical, so one translation covers both.
 pub mod codes {
     pub const SERVER_URL_REQUIRED:      &str = "SERVER_URL_REQUIRED";
+    pub const INSECURE_SERVER_URL:      &str = "INSECURE_SERVER_URL";
     pub const SESSION_EXPIRED:          &str = "SESSION_EXPIRED";
     pub const SYNC_ROOT_NOT_FOUND:      &str = "SYNC_ROOT_NOT_FOUND";
     pub const CONFLICT_COPY_MISSING:    &str = "CONFLICT_COPY_MISSING";

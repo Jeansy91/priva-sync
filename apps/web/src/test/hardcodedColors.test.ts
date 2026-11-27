@@ -18,9 +18,11 @@ const sources: Record<string, string> = {
 // Glob keys are relative to this file (apps/web/src/test) — rebase them onto
 // the repo root so violations and the allowlist read naturally.
 function toRepoPath(key: string): string {
-  if (key.startsWith('../../../../packages/')) return key.replace('../../../../', '')
-  if (key.startsWith('../../../desktop/')) return key.replace('../../../', 'apps/')
-  return key.replace('../', 'apps/web/src/')
+  // Every glob key starts with its relative prefix, so swap exactly that prefix.
+  const rebase = (prefix: string, to: string) => to + key.slice(prefix.length)
+  if (key.startsWith('../../../../packages/')) return rebase('../../../../', '')
+  if (key.startsWith('../../../desktop/')) return rebase('../../../', 'apps/')
+  return rebase('../', 'apps/web/src/')
 }
 
 // Grayscale palette classes in any variant chain (dark:, hover:, …).

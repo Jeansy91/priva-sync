@@ -275,3 +275,65 @@ func TestMakeDirAndCreateStaging(t *testing.T) {
 		t.Fatal("CreateStaging must reject a traversal target")
 	}
 }
+
+// A hostile root id must not address anything outside {dataPath}/{userID}.
+func TestRootID_RejectsEscapes(t *testing.T) {
+	s := NewService(t.TempDir())
+	uid := uuid.New()
+	for _, id := range []string{"", ".", "..", "../x", "a/b", `a\b`, "a\x00b"} {
+		if _, _, err := s.WriteFile(uid, id, "f.txt", strings.NewReader("x")); err == nil {
+			t.Errorf("WriteFile must reject root id %q", id)
+		}
+		if err := s.MakeDir(uid, id, "d"); err == nil {
+			t.Errorf("MakeDir must reject root id %q", id)
+		}
+		if _, err := s.Open(uid, id, "f.txt"); err == nil {
+			t.Errorf("Open must reject root id %q", id)
+		}
+	}
+}
+
+// A path that dips out of the root and back in is still refused, and a
+// leading slash is treated as relative to the sync root.
+func TestPath_DotDotAndLeadingSlash(t *testing.T) {
+	s := NewService(t.TempDir())
+	uid := uuid.New()
+	if _, _, err := s.WriteFile(uid, "root1", "a/../../root1/f.txt", strings.NewReader("x")); err == nil {
+		t.Fatal("WriteFile must reject a path that leaves the sync root")
+	}
+	if _, _, err := s.WriteFile(uid, "root1", "/abs/f.txt", strings.NewReader("x")); err != nil {
+		t.Fatalf("leading slash must resolve inside the root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(s.RootDir(uid, "root1"), "abs", "f.txt")); err != nil {
+		t.Fatalf("file must land inside the sync root: %v", err)
+	}
+}
+
+// A symlink inside a sync root that points outside the data root must not be
+// followed by reads, writes or deletes.
+func TestSymlinkEscape_IsNotFollowed(t *testing.T) {
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := NewService(t.TempDir())
+	uid := uuid.New()
+	if err := s.CreateRootDir(uid, "root1"); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(s.RootDir(uid, "root1"), "escape")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := s.Open(uid, "root1", "escape/secret.txt"); err == nil {
+		t.Error("Open must not follow a symlink out of the data root")
+	}
+	if _, _, err := s.WriteFile(uid, "root1", "escape/new.txt", strings.NewReader("x")); err == nil {
+		t.Error("WriteFile must not follow a symlink out of the data root")
+	}
+	// DeleteFile treats a missing file as success, so only the outcome counts.
+	_ = s.DeleteFile(uid, "root1", "escape/secret.txt")
+	if _, err := os.Stat(filepath.Join(outside, "secret.txt")); err != nil {
+		t.Errorf("outside file must be untouched: %v", err)
+	}
+}

@@ -24,8 +24,8 @@ serde_json                = "1"
 tokio                     = { version = "1", features = ["full"] }
 tokio-util                = { version = "0.7", features = ["io"] }
 reqwest                   = { version = "0.13", features = ["json", "stream"] }
-notify                    = "7"
-rusqlite                  = { version = "0.41", features = ["bundled"] }
+notify                    = "9"
+rusqlite                  = { version = "0.43", features = ["bundled"] }
 blake3                    = "1"
 fs2                       = "0.4"
 base64                    = "0.23"
@@ -43,9 +43,9 @@ uuid                      = { version = "1", features = ["v4"] }
 hex                       = "0.4"
 unicode-normalization     = "0.1"
 url                       = "2"
-rust-i18n                 = "3"
+rust-i18n                 = "4"
 os_info                   = { version = "3", default-features = false }
-gethostname               = "0.5"
+gethostname               = "1.1"
 
 [dev-dependencies]
 mockito = "1"
