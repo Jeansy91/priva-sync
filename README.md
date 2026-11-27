@@ -27,7 +27,23 @@ PrivaSync mirrors your files between several clients and one central server. The
 
 ## Screenshots
 
-<!-- screenshots: docs/images/web-files.png, docs/images/web-admin.png, docs/images/desktop-explorer.png -->
+![Files view with folder tree and detail panel](docs/images/files-light.png)
+
+| Conflict resolution | Shares |
+|---|---|
+| ![Resolving a sync conflict with a side-by-side comparison](docs/images/conflict-resolve.png) | ![Shares with users and public links](docs/images/shares.png) |
+| **Dark mode** | **Grid view** |
+| ![Files view in dark mode](docs/images/files-dark.png) | ![Files in the grid view with thumbnails](docs/images/files-grid-light.png) |
+
+<details>
+<summary>More: trash, user management, devices, audit log</summary>
+
+![Trash with storage usage](docs/images/trash.png)
+![User management with quotas](docs/images/admin-users.png)
+![Registered desktop clients](docs/images/admin-devices.png)
+![Audit log](docs/images/audit-log.png)
+
+</details>
 
 ## Architecture
 

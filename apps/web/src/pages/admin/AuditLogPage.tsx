@@ -219,7 +219,7 @@ export default function AuditLogPage() {
                     return (
                       <tr key={ev.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors">
                         <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(ev.created_at).toLocaleString()}
+                          {new Date(ev.created_at).toLocaleString(localeTag)}
                         </td>
                         <td className="px-4 py-2 text-xs">
                           <div>{eventLabel(ev.event_type)}</div>
