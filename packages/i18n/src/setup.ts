@@ -4,6 +4,16 @@ import de from "./locales/de.json";
 import en from "./locales/en.json";
 import { resolveLanguage } from "./resolveLanguage";
 
+// i18next 27 defaults `strictInterpolationChecks` to true, which makes
+// `t()` require an options object for strings with variables and breaks
+// helpers that take a loosely typed `(key: string, vars?) => string`.
+// Keep the pre-27 behaviour; the runtime is unaffected by this flag.
+declare module "i18next" {
+  interface CustomTypeOptions {
+    strictInterpolationChecks: false;
+  }
+}
+
 export const SUPPORTED_LANGUAGES = ["de", "en"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
