@@ -37,24 +37,25 @@ func (s *Service) CreateRootDir(userID uuid.UUID, rootID string) error {
 // written + the BLAKE3 hash. Writes to a temporary file first and renames
 // atomically so a partial file never becomes visible.
 func (s *Service) WriteFile(userID uuid.UUID, rootID, filePath string, r io.Reader) (written int64, hash []byte, err error) {
-	absPath, err := s.safePath(userID, rootID, filePath)
+	root, rel, err := s.open(userID, rootID, filePath)
 	if err != nil {
 		return 0, nil, err
 	}
+	defer root.Close()
 
-	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+	if err := root.MkdirAll(filepath.Dir(rel), 0755); err != nil {
 		return 0, nil, fmt.Errorf("creating directories: %w", err)
 	}
 
-	tmpFile, err := os.CreateTemp(filepath.Dir(absPath), ".tmp-*")
+	tmpPath := filepath.Join(filepath.Dir(rel), ".tmp-"+uuid.NewString())
+	tmpFile, err := root.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return 0, nil, fmt.Errorf("creating temp file: %w", err)
 	}
-	tmpPath := tmpFile.Name()
 	defer func() {
 		tmpFile.Close()
 		if err != nil {
-			_ = os.Remove(tmpPath)
+			_ = root.Remove(tmpPath)
 		}
 	}()
 
@@ -73,7 +74,7 @@ func (s *Service) WriteFile(userID uuid.UUID, rootID, filePath string, r io.Read
 		return 0, nil, fmt.Errorf("closing file: %w", err)
 	}
 
-	if err = os.Rename(tmpPath, absPath); err != nil {
+	if err = root.Rename(tmpPath, rel); err != nil {
 		return 0, nil, fmt.Errorf("renaming temp file: %w", err)
 	}
 
@@ -84,11 +85,12 @@ func (s *Service) WriteFile(userID uuid.UUID, rootID, filePath string, r io.Read
 // is guarded by safePath. The caller owns closing the returned file. Used by
 // the WebDAV adapter, where http.ServeContent needs an io.ReadSeeker.
 func (s *Service) Open(userID uuid.UUID, rootID, filePath string) (*os.File, error) {
-	absPath, err := s.safePath(userID, rootID, filePath)
+	root, rel, err := s.open(userID, rootID, filePath)
 	if err != nil {
 		return nil, err
 	}
-	return os.Open(absPath)
+	defer root.Close()
+	return root.Open(rel)
 }
 
 // CreateStaging creates a uniquely-named staging file next to its eventual
@@ -100,14 +102,15 @@ func (s *Service) Open(userID uuid.UUID, rootID, filePath string) (*os.File, err
 // staging file.
 func (s *Service) CreateStaging(userID uuid.UUID, rootID, targetPath string) (string, *os.File, error) {
 	staging := targetPath + ".staging-" + uuid.NewString()
-	absPath, err := s.safePath(userID, rootID, staging)
+	root, rel, err := s.open(userID, rootID, staging)
 	if err != nil {
 		return "", nil, err
 	}
-	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+	defer root.Close()
+	if err := root.MkdirAll(filepath.Dir(rel), 0755); err != nil {
 		return "", nil, fmt.Errorf("creating staging dir: %w", err)
 	}
-	f, err := os.Create(absPath)
+	f, err := root.Create(rel)
 	if err != nil {
 		return "", nil, fmt.Errorf("creating staging file: %w", err)
 	}
@@ -116,12 +119,13 @@ func (s *Service) CreateStaging(userID uuid.UUID, rootID, targetPath string) (st
 
 // ServeFile streamt eine Datei in den Writer.
 func (s *Service) ServeFile(userID uuid.UUID, rootID, filePath string, w io.Writer) error {
-	absPath, err := s.safePath(userID, rootID, filePath)
+	root, rel, err := s.open(userID, rootID, filePath)
 	if err != nil {
 		return err
 	}
+	defer root.Close()
 
-	f, err := os.Open(absPath)
+	f, err := root.Open(rel)
 	if errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("file not found")
 	}
@@ -136,12 +140,13 @@ func (s *Service) ServeFile(userID uuid.UUID, rootID, filePath string, w io.Writ
 
 // DeleteFile permanently removes a file (skipping the trash).
 func (s *Service) DeleteFile(userID uuid.UUID, rootID, filePath string) error {
-	absPath, err := s.safePath(userID, rootID, filePath)
+	root, rel, err := s.open(userID, rootID, filePath)
 	if err != nil {
 		return err
 	}
+	defer root.Close()
 
-	if err := os.Remove(absPath); errors.Is(err, os.ErrNotExist) {
+	if err := root.Remove(rel); errors.Is(err, os.ErrNotExist) {
 		return nil // already gone is fine
 	}
 	return err
@@ -614,11 +619,12 @@ func (s *Service) DeleteChunkDir(sessionID fmt.Stringer) error {
 // sync feature so the on-disk tree mirrors the DB and recovery can detect it.
 // Idempotent — existing dirs are not an error.
 func (s *Service) MakeDir(userID uuid.UUID, rootID, dirPath string) error {
-	absPath, err := s.safePath(userID, rootID, dirPath)
+	root, rel, err := s.open(userID, rootID, dirPath)
 	if err != nil {
 		return err
 	}
-	return os.MkdirAll(absPath, 0755)
+	defer root.Close()
+	return root.MkdirAll(rel, 0755)
 }
 
 // RootDir returns the absolute path of a sync root on disk.
@@ -631,17 +637,51 @@ func (s *Service) rootDir(userID uuid.UUID, rootID string) string {
 	return filepath.Join(s.dataPath, userID.String(), rootID)
 }
 
-// safePath erstellt den absoluten Pfad und verhindert Path-Traversal.
-func (s *Service) safePath(userID uuid.UUID, rootID, filePath string) (string, error) {
-	base := s.rootDir(userID, rootID)
-	// filePath is already cleaned by sanitizePath(); double-check for safety.
-	joined := filepath.Join(base, filepath.FromSlash(filePath))
-	clean := filepath.Clean(joined)
-
-	if !strings.HasPrefix(clean, filepath.Clean(base)+string(os.PathSeparator)) &&
-		clean != filepath.Clean(base) {
+// relPath validates the caller-supplied identifiers and returns the path of a
+// file relative to the data root: {userID}/{rootID}/{filePath}. rootID must be
+// a single path segment and filePath must stay inside the sync root; leading
+// slashes are ignored so "/a/b" and "a/b" address the same file.
+func relPath(userID uuid.UUID, rootID, filePath string) (string, error) {
+	if rootID == "" || rootID == "." || rootID == ".." || strings.ContainsAny(rootID, "/\\\x00") {
+		return "", fmt.Errorf("invalid root id")
+	}
+	p := filepath.FromSlash(strings.TrimLeft(filePath, "/"))
+	if p == "" {
+		p = "."
+	}
+	if !filepath.IsLocal(p) {
 		return "", fmt.Errorf("invalid path: outside sync root")
 	}
+	return filepath.Join(userID.String(), rootID, p), nil
+}
 
-	return clean, nil
+// open opens the data root as an os.Root and returns it together with the
+// validated relative path. All file access below the data root goes through
+// the returned handle, so ".." components and symlinks cannot lead out of it.
+// The caller must Close the root.
+func (s *Service) open(userID uuid.UUID, rootID, filePath string) (*os.Root, string, error) {
+	rel, err := relPath(userID, rootID, filePath)
+	if err != nil {
+		return nil, "", err
+	}
+	root, err := os.OpenRoot(s.dataPath)
+	if errors.Is(err, os.ErrNotExist) {
+		if err = os.MkdirAll(s.dataPath, 0755); err == nil {
+			root, err = os.OpenRoot(s.dataPath)
+		}
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("opening data root: %w", err)
+	}
+	return root, rel, nil
+}
+
+// safePath returns the absolute path of a file inside a sync root and rejects
+// anything that would leave it.
+func (s *Service) safePath(userID uuid.UUID, rootID, filePath string) (string, error) {
+	rel, err := relPath(userID, rootID, filePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(s.dataPath, rel), nil
 }
