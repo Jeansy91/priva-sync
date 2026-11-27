@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"io/fs"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -13,6 +15,7 @@ import (
 type SPAHandler struct {
 	root      string
 	indexPath string
+	fsys      fs.FS
 	fs        http.Handler
 }
 
@@ -24,6 +27,7 @@ func NewSPAHandler(root string) *SPAHandler {
 	return &SPAHandler{
 		root:      abs,
 		indexPath: filepath.Join(abs, "index.html"),
+		fsys:      os.DirFS(abs),
 		fs:        http.FileServer(http.Dir(abs)),
 	}
 }
@@ -37,28 +41,22 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// nosemgrep: go.lang.security.filepath-clean-misuse.filepath-clean-misuse -- Clean is not the sanitiser here; the resolved candidate is verified below to stay under the absolute root (h.root is filepath.Abs'd in the constructor), which is the actual traversal guard
-	clean := filepath.Clean(r.URL.Path)
-	if strings.HasPrefix(clean, "..") {
-		http.Error(w, "invalid path", http.StatusBadRequest)
-		return
+	// A ".." segment is never legitimate for a static asset.
+	for _, seg := range strings.Split(r.URL.Path, "/") {
+		if seg == ".." {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
 	}
 
-	candidate := filepath.Join(h.root, clean)
-	// Trailing separator on the prefix so a sibling like `<root>-evil` cannot
-	// pass as if it were inside `<root>`; the root itself is also allowed.
-	if candidate != h.root && !strings.HasPrefix(candidate, h.root+string(os.PathSeparator)) {
-		http.Error(w, "invalid path", http.StatusBadRequest)
-		return
+	// The lookup goes through an fs.FS rooted at the asset directory, which
+	// only accepts slash-separated paths below that root. The file is only
+	// stat'ed here; its bytes are served by http.FileServer over http.Dir.
+	name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+	if name == "" {
+		name = "."
 	}
-
-	// #nosec G703 -- the taint analysis follows r.URL.Path into os.Stat and does
-	// not model the containment check directly above: a candidate outside the
-	// absolute root is answered with 400 before reaching here, and Clean on an
-	// absolute URL path cannot escape upwards in the first place. The bytes are
-	// then served by http.FileServer over http.Dir, which sanitises again --
-	// candidate is only ever stat'ed. Same reasoning as the nosemgrep above.
-	info, err := os.Stat(candidate)
+	info, err := fs.Stat(h.fsys, name)
 	if err == nil && !info.IsDir() {
 		h.fs.ServeHTTP(w, r)
 		return

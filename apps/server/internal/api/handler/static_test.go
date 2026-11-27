@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -74,5 +75,30 @@ func TestSPAHandler_RejectsPathTraversal(t *testing.T) {
 
 	if w.Code != 400 {
 		t.Fatalf("status = %d, want 400; body=%s", w.Code, w.Body.String())
+	}
+}
+
+// A sibling directory whose name starts with the root's name must stay
+// unreachable, also with an encoded or embedded ".." segment.
+func TestSPAHandler_DoesNotServeSiblingOfRoot(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "web")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("index"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "web-secret.txt"), []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := NewSPAHandler(root)
+
+	for _, target := range []string{"/a/../../web-secret.txt", "/%2e%2e/web-secret.txt"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", target, nil))
+		if w.Code != 400 || strings.Contains(w.Body.String(), "secret") {
+			t.Errorf("GET %s: status = %d, body = %q; want 400 without the secret", target, w.Code, w.Body.String())
+		}
 	}
 }
