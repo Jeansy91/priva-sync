@@ -45,7 +45,7 @@ unicode-normalization     = "0.1"
 url                       = "2"
 rust-i18n                 = "3"
 os_info                   = { version = "3", default-features = false }
-gethostname               = "0.5"
+gethostname               = "1.1"
 
 [dev-dependencies]
 mockito = "1"
