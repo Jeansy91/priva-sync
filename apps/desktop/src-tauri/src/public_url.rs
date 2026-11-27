@@ -38,6 +38,36 @@ pub fn normalize_public_url(input: &str) -> String {
     out
 }
 
+/// True when `url` would send credentials in clear text over a network we
+/// cannot assume to be private: plain `http://` to a host that is neither
+/// loopback nor a private/link-local address nor a single-label or `.local`/
+/// `.lan` name. `https://` and local development/LAN setups are fine.
+pub fn is_cleartext_remote(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url) else { return false };
+    if parsed.scheme() != "http" {
+        return false;
+    }
+    match parsed.host() {
+        None => false,
+        Some(url::Host::Ipv4(ip)) => !(ip.is_loopback() || ip.is_private() || ip.is_link_local()),
+        Some(url::Host::Ipv6(ip)) => {
+            let seg0 = ip.segments()[0];
+            let unique_local = (seg0 & 0xfe00) == 0xfc00;
+            let link_local = (seg0 & 0xffc0) == 0xfe80;
+            !(ip.is_loopback() || unique_local || link_local)
+        }
+        Some(url::Host::Domain(name)) => {
+            let n = name.trim_end_matches('.').to_ascii_lowercase();
+            let local = n == "localhost"
+                || n.ends_with(".localhost")
+                || !n.contains('.')
+                || n.ends_with(".local")
+                || n.ends_with(".lan");
+            !local
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +111,19 @@ mod tests {
     #[test]
     fn blank_stays_blank() {
         assert_eq!(normalize_public_url("   "), "");
+    }
+
+    #[test]
+    fn cleartext_is_flagged_only_for_remote_http() {
+        assert!(is_cleartext_remote("http://sync.example.com"));
+        assert!(is_cleartext_remote("http://8.8.8.8:8080"));
+        assert!(!is_cleartext_remote("https://sync.example.com"));
+        assert!(!is_cleartext_remote("http://localhost:8080"));
+        assert!(!is_cleartext_remote("http://127.0.0.1:8080"));
+        assert!(!is_cleartext_remote("http://[::1]:8080"));
+        assert!(!is_cleartext_remote("http://192.168.1.20:8080"));
+        assert!(!is_cleartext_remote("http://nas:8080"));
+        assert!(!is_cleartext_remote("http://nas.local"));
+        assert!(!is_cleartext_remote("not a url"));
     }
 }

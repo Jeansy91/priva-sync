@@ -954,6 +954,7 @@
     "SYNC_ROOT_NOT_FOUND": "Sync folder not found.",
     "SYNC_ROOT_ALREADY_EXISTS": "Sync folder already exists.",
     "SERVER_URL_REQUIRED": "Server URL required.",
+    "INSECURE_SERVER_URL": "Unencrypted connection refused. Use an https:// address for remote servers.",
     "SESSION_EXPIRED": "Session expired. Please sign in again.",
     "CONFLICT_COPY_MISSING": "Conflict copy not found.",
     "ON_DEMAND_ON_DRIVE_ROOT": "The folder is a drive root — Windows does not allow cloud files there. The folder syncs in full.",

@@ -954,6 +954,7 @@
     "SYNC_ROOT_NOT_FOUND": "Sync-Ordner nicht gefunden.",
     "SYNC_ROOT_ALREADY_EXISTS": "Sync-Ordner existiert bereits.",
     "SERVER_URL_REQUIRED": "Server-URL erforderlich.",
+    "INSECURE_SERVER_URL": "Unverschlüsselte Verbindung abgelehnt. Für entfernte Server bitte eine https://-Adresse verwenden.",
     "SESSION_EXPIRED": "Sitzung abgelaufen. Bitte neu anmelden.",
     "CONFLICT_COPY_MISSING": "Konfliktkopie nicht gefunden.",
     "ON_DEMAND_ON_DRIVE_ROOT": "Der Ordner liegt auf einem Laufwerks-Root — Windows lässt dort keine Cloud-Dateien zu. Der Ordner synchronisiert vollständig.",
