@@ -43,7 +43,7 @@ uuid                      = { version = "1", features = ["v4"] }
 hex                       = "0.4"
 unicode-normalization     = "0.1"
 url                       = "2"
-rust-i18n                 = "3"
+rust-i18n                 = "4"
 os_info                   = { version = "3", default-features = false }
 gethostname               = "0.5"
 
